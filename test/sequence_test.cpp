@@ -145,6 +145,170 @@ TEST(all, finds_at_least_one_value_is_not_true) {
 }
 
 
+TEST(first, provides_first_value_in_the_sequence) {
+   // Given
+   int expected = std::rand() % 5;
+   RecordProperty("expected", expected);
+   auto target = sequence<int>::range(expected, 10);
+
+   // When
+   int actual = target.first();
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(first, throws_when_the_sequence_is_empty) {
+   // Given
+   auto target = sequence<int>::empty_sequence();
+
+   // When
+   ASSERT_THROW(target.first(), std::range_error);
+}
+
+
+TEST(first_or_default, returns_first_value_in_the_sequence_when_the_sequence_is_not_empty) {
+   // Given
+   int expected = std::rand() % 3;
+   RecordProperty("expected", expected);
+   auto target = sequence<int>::range(expected, 10);
+
+   // When
+   int actual = target.first_or_default();
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(first_or_default, returns_default_constructed_value_when_the_sequence_is_empty) {
+   // Given
+   int expected = int();
+   auto target = sequence<int>::empty_sequence();;
+
+   // When
+   int actual = target.first_or_default();
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(first_or_default, returns_provided_default_value_when_the_sequence_is_empty) {
+   // Given
+   int expected = std::rand() % 87;
+   RecordProperty("expected", expected);
+   auto target = sequence<int>::empty_sequence();;
+
+   // When
+   int actual = target.first_or_default(expected);
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(last, provides_last_value_in_the_sequence) {
+   // Given
+   int expected = (std::rand() % 7) + 1;
+   RecordProperty("expected", expected);
+   auto target = sequence<int>::range(0, expected + 1);
+
+   // When
+   int actual = target.last();
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(last, throws_when_the_sequence_is_empty) {
+   // Given
+   auto target = sequence<int>::empty_sequence();
+
+   // When
+   ASSERT_THROW(target.last(), std::range_error);
+}
+
+
+TEST(last_or_default, returns_last_value_in_the_sequence_when_the_sequence_is_not_empty) {
+   // Given
+   int expected = (std::rand() % 7) + 3;
+   RecordProperty("expected", expected);
+   auto target = sequence<int>::range(2, expected + 1);
+
+   // When
+   int actual = target.last_or_default();
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(last_or_default, returns_default_constructed_value_when_the_sequence_is_empty) {
+   // Given
+   int expected = int();
+   auto target = sequence<int>::empty_sequence();;
+
+   // When
+   int actual = target.last_or_default();
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(last_or_default, returns_provided_default_value_when_the_sequence_is_empty) {
+   // Given
+   int expected = (std::rand() % 37) + 3;
+   RecordProperty("expected", expected);
+   auto target = sequence<int>::empty_sequence();;
+
+   // When
+   int actual = target.last_or_default(expected);
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(contains, returns_false_on_empty_sequence) {
+   // Given
+   auto target = sequence<char>::empty_sequence();
+
+   // When
+   bool actual = target.contains('n');
+
+   // Then
+   ASSERT_FALSE(actual);
+}
+
+
+TEST(contains, returns_false_when_sequence_does_not_have_item) {
+   // Given
+   auto target = sequence<char>::from("abc");
+
+   // When
+   bool actual = target.contains('n');
+
+   // Then
+   ASSERT_FALSE(actual);
+}
+
+
+TEST(contains, returns_true_when_sequence_has_item) {
+   // Given
+   auto target = sequence<char>::from("abc");
+
+   // When
+   bool actual = target.contains('c');
+
+   // Then
+   ASSERT_TRUE(actual);
+}
+
+
 TEST(where, filters_out_uninteresting_values) {
    // Given
    const int start = 0;
@@ -350,6 +514,62 @@ TEST(page, returns_remaining_elements_on_last_page_with_smaller_than_page_size) 
 
   // Then
   ASSERT_EQ(2, actual);
+}
+
+
+TEST(except, properly_performs_set_difference) {
+   // Given
+   auto l = sequence<int>::range(0, 15);
+   auto r = sequence<int>::range(0, 15).where([](int x) { return x % 2 == 1; });
+   auto expected = { 0, 2, 4, 6, 8, 10, 12, 14 };
+
+   // When
+   auto actual = l.except(r);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(symmetric_differency, properly_performs_set_difference) {
+   // Given
+   auto l = sequence<int>::range(7, 15);
+   auto r = sequence<int>::range(0, 10);
+   auto expected = { 0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14 };
+
+   // When
+   auto actual = l.symmetric_difference(r);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(intersect_with, properly_performs_intersection) {
+   // Given
+   auto l = sequence<int>::range(7, 15);
+   auto r = sequence<int>::range(0, 10);
+   auto expected = { 7, 8, 9 };
+
+   // When
+   auto actual = l.intersect_with(r);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(union_with, properly_performs_union) {
+   // Given
+   auto l = sequence<int>::range(7, 15);
+   auto r = sequence<int>::range(0, 10);
+   auto expected = sequence<int>::range(0, 15);
+
+   // When
+   auto actual = l.union_with(r);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
 }
 
 }

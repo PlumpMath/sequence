@@ -72,6 +72,12 @@ public:
    typedef sequence_iterator<T> const_iterator;
    typedef typename coro_t::caller_type sink_type;
 
+   template<class Fun>
+   explicit inline sequence(Fun f) :
+      coro(std::make_shared<coro_t>(std::move(f)))
+   {
+   }
+
    sequence() = delete;
    sequence(sequence &&) = default;
    sequence(const sequence &) = delete;
@@ -350,6 +356,18 @@ public:
             .take(page_size);
    }
 
+   template<class Comp=std::less<T>>
+   inline sequence<T> union_with(const sequence<T> &other, Comp comp=Comp());
+
+   template<class Comp=std::less<T>>
+   inline sequence<T> intersect_with(const sequence<T> &other, Comp comp=Comp());
+
+   template<class Comp=std::less<T>>
+   inline sequence<T> except(const sequence<T> &other, Comp comp=Comp());
+
+   template<class Comp=std::less<T>>
+   inline sequence<T> symmetric_difference(const sequence<T> &other, Comp comp=Comp());
+
    template<class Container>
    static inline sequence<T> from(Container & c) {
       return from(std::begin(c), std::end(c));
@@ -403,12 +421,6 @@ public:
    }
 
 private:
-   template<class Fun>
-   explicit inline sequence(Fun f) :
-      coro(std::make_shared<coro_t>(std::move(f)))
-   {
-   }
-
    static inline void check_delta(T delta, std::true_type) {
       if (!(0 < delta)) {
          throw std::domain_error("Delta must be positive.");
@@ -420,5 +432,104 @@ private:
 
    std::shared_ptr<coro_t> coro;
 };
+
+
+template<class T>
+class sequence_sink_iterator : public std::iterator<std::output_iterator_tag, void, void, void, void> {
+public:
+   typedef sequence<T> sequence_type;
+   typedef typename sequence_type::sink_type sink_type;
+   class reference {
+   public:
+      explicit inline reference(sink_type &s) :
+         sink(s)
+      {
+      }
+
+      inline reference &operator =(const T &t) {
+         sink(t);
+         return *this;
+      }
+
+   private:
+      sink_type &sink;
+   };
+
+   explicit inline sequence_sink_iterator(sink_type &s) :
+      sink(s)
+   {
+   }
+
+   inline reference operator*() {
+      return reference(sink);
+   }
+
+   inline sequence_sink_iterator<T> &operator++() {
+      return *this;
+   }
+
+   inline sequence_sink_iterator<T> &operator++(int) {
+      return *this;
+   }
+
+private:
+   sink_type &sink;
+};
+
+
+template<class T>
+template<class Comp>
+inline sequence<T> sequence<T>::union_with(const sequence<T> &other, Comp comp) {
+   auto l_co = coro;
+   auto r_co = other.coro;
+
+   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
+         std::set_union(boost::begin(*l_co), boost::end(*l_co),
+                        boost::begin(*r_co), boost::end(*r_co),
+                        sequence_sink_iterator<T>(sink));
+      });
+}
+
+
+template<class T>
+template<class Comp>
+inline sequence<T> sequence<T>::intersect_with(const sequence<T> &other, Comp comp) {
+   auto l_co = coro;
+   auto r_co = other.coro;
+
+   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
+         std::set_intersection(boost::begin(*l_co), boost::end(*l_co),
+                               boost::begin(*r_co), boost::end(*r_co),
+                               sequence_sink_iterator<T>(sink));
+      });
+}
+
+
+template<class T>
+template<class Comp>
+inline sequence<T> sequence<T>::except(const sequence<T> &other, Comp comp) {
+   auto l_co = coro;
+   auto r_co = other.coro;
+
+   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
+         std::set_difference(boost::begin(*l_co), boost::end(*l_co),
+                             boost::begin(*r_co), boost::end(*r_co),
+                             sequence_sink_iterator<T>(sink));
+      });
+}
+
+
+template<class T>
+template<class Comp>
+inline sequence<T> sequence<T>::symmetric_difference(const sequence<T> &other, Comp comp) {
+   auto l_co = coro;
+   auto r_co = other.coro;
+
+   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
+         std::set_symmetric_difference(boost::begin(*l_co), boost::end(*l_co),
+                                       boost::begin(*r_co), boost::end(*r_co),
+                                       sequence_sink_iterator<T>(sink));
+      });
+}
 
 #endif

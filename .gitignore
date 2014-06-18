@@ -21,6 +21,9 @@
 *.app
 test/sequence_test
 
+# Executable output
+test/callgrind.out.*
+
 # Editor swap files
 *~
 .*.swp
