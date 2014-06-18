@@ -292,6 +292,66 @@ TEST(select_many, extracts_single_value_to_many) {
    ASSERT_TRUE(actual);
 }
 
+
+TEST(take, returns_all_elements_when_n_is_greater_than_number_of_elements) {
+  // Given
+  auto target = sequence<int>::from({1, 2, 3, 4, 5, 6}).take(20);
+
+  // When
+  std::size_t actual = target.count();
+
+  // Then
+  ASSERT_EQ(6, actual);
+}
+
+
+TEST(page, returns_page_size_when_enough_elements_are_available) {
+  // Given
+  auto target = sequence<double>::from({1.0, 2.0, 3.0, 4.0, 5.0, 6.0}).page(0, 2);
+
+  // When
+  std::size_t actual = target.count();
+
+  // Then
+  ASSERT_EQ(2, actual);
+}
+
+
+TEST(page, returns_page_number_when_enough_elements_are_available) {
+  // Given
+  auto target = sequence<int>::from({1, 2, 3, 4, 5, 6}).page(1, 2);
+
+  // When
+  int actual = target.first();
+
+  // Then
+  ASSERT_EQ(3, actual);
+}
+
+
+TEST(page, returns_empty_sequence_when_page_number_is_too_large) {
+  // Given
+  auto target = sequence<double>::from({1.0, 2.0, 3.0, 4.0, 5.0, 6.0}).page(10, 2);
+
+  // When
+  bool actual = target.empty();
+
+  // Then
+  ASSERT_TRUE(actual);
+}
+
+
+TEST(page, returns_remaining_elements_on_last_page_with_smaller_than_page_size) {
+  // Given
+  auto target = sequence<int>::from({1, 2, 3, 4, 5, 6}).page(1, 4);
+
+  // When
+  std::size_t actual = target.count();
+
+  // Then
+  ASSERT_EQ(2, actual);
+}
+
 }
 
 

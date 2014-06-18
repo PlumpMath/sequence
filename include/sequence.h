@@ -101,18 +101,18 @@ public:
    }
 
    template<class Predicate>
-   inline bool any(Predicate predicate) const {
+   inline bool any(Predicate predicate) {
       auto iter = std::find_if(begin(), end(), predicate);
       return iter != end();
    }
 
    template<class Predicate>
-   inline bool all(Predicate predicate) const {
+   inline bool all(Predicate predicate) {
       auto iter = std::find_if(begin(), end(), [predicate](const T &t) { return !predicate(t); });
       return iter == end();
    }
 
-   inline T first() const {
+   inline T first() {
       auto iter = begin();
       if (iter == end()) {
          throw std::range_error("First cannot be computed on empty sequence.");
@@ -120,7 +120,7 @@ public:
       return *iter;
    }
 
-   inline T first_or_default(const T &default_value=T()) const {
+   inline T first_or_default(const T &default_value=T()) {
       auto iter = begin();
       if (iter == end()) {
          return default_value;
@@ -128,7 +128,7 @@ public:
       return *iter;
    }
 
-   inline T last() const {
+   inline T last() {
       auto i = begin();
       auto e = end();
       if (i == e) {
@@ -142,14 +142,14 @@ public:
       return result;
    }
 
-   inline T last_or_default(T default_value=T()) const {
+   inline T last_or_default(T default_value=T()) {
       for (auto i = begin(); i != end(); ++i) {
          default_value = *i;
       }
       return default_value;
    }
 
-   inline bool contains(const T &value) const {
+   inline bool contains(const T &value) {
       return std::find(begin(), end(), value) != end();
    }
 
@@ -158,12 +158,12 @@ public:
    }
 
    template<class Predicate>
-   inline std::size_t count(Predicate predicate) const {
+   inline std::size_t count(Predicate predicate) {
       return std::count_if(begin(), end(), predicate);
    }
 
    template<class U>
-   inline sequence<std::pair<T, U>> zip_with(const sequence<U> &other) const {
+   inline sequence<std::pair<T, U>> zip_with(const sequence<U> &other) {
       auto t_coro = this->coro;
       auto u_coro = other.coro;
       return sequence<std::pair<T, U>>([t_coro, u_coro](typename sequence<std::pair<T, U>>::coro_t::caller_type &put) {
@@ -197,7 +197,7 @@ public:
    }
 
    template<class Comp=std::less<T>>
-   inline T max(Comp comp=Comp()) const {
+   inline T max(Comp comp=Comp()) {
       auto iter = std::max_element(begin(), end(), comp);
       if (iter == end()) {
          throw std::range_error("Max cannot be computed on empty sequence.");
@@ -206,7 +206,7 @@ public:
    }
 
    template<class Comp=std::less<T>>
-   inline T min(Comp comp=Comp()) const {
+   inline T min(Comp comp=Comp()) {
       auto iter = std::min_element(begin(), end(), comp);
       if (iter == end()) {
          throw std::range_error("Min cannot be computed on empty sequence.");
@@ -224,13 +224,13 @@ public:
    }
 
    template<class Add=std::plus<T>>
-   inline T sum(T initial=T(), Add add=Add()) const {
+   inline T sum(T initial=T(), Add add=Add()) {
       return std::accumulate(begin(), end(), initial, add);
    }
 
    template<class U, class R=typename std::common_type<T, U>::type, class BinOp2=std::multiplies<typename std::common_type<T, U>::type>,
             class BinOp1=std::plus<typename std::common_type<T, U>::type>>
-   inline R inner_product(const sequence<U> &rhs, R init=R(), BinOp1 binOp1=BinOp1(), BinOp2 binOp2=BinOp2()) const {
+   inline R inner_product(const sequence<U> &rhs, R init=R(), BinOp1 binOp1=BinOp1(), BinOp2 binOp2=BinOp2()) {
       return std::inner_product(begin(), end(), rhs.begin(), init, binOp1, binOp2);
    }
 
@@ -322,8 +322,8 @@ public:
                ++iter; ++i;
             }
 
-            while (i != iend) {
-               put(*i);
+            while (iter != eiter) {
+               put(*iter++);
             }
          });
    }
@@ -340,9 +340,14 @@ public:
             }
 
             while (i != iend) {
-               put(*i);
+               put(*i++);
             }
          });
+   }
+
+   inline sequence<T> page(std::size_t page_number, std::size_t page_size) {
+      return skip(page_number * page_size)
+            .take(page_size);
    }
 
    template<class Container>
