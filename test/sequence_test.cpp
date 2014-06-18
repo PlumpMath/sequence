@@ -211,7 +211,7 @@ TEST(max, throws_domain_error_on_empty_sequence) {
    auto target = sequence<int>::empty_sequence();
 
    // When
-   ASSERT_THROW(target.max(), std::domain_error);
+   ASSERT_THROW(target.max(), std::range_error);
 }
 
 
@@ -235,7 +235,61 @@ TEST(min, throws_domain_error_on_empty_sequence) {
    auto target = sequence<int>::empty_sequence();
 
    // When
-   ASSERT_THROW(target.min(), std::domain_error);
+   ASSERT_THROW(target.min(), std::range_error);
+}
+
+
+TEST(inner_product, resolves_type_correctly) {
+   // Given
+   auto dtarget = sequence<double>::from({1.0, 2.0, 3.0});
+   auto itarget = sequence<int>::from({3, 2, 1});
+
+   // When
+   auto actual = dtarget.inner_product(itarget);
+
+   // Then
+   ASSERT_TRUE((std::is_same<double, decltype(actual)>::value));
+}
+
+
+TEST(inner_product, calculates_correctly) {
+   // Given
+   auto dtarget = sequence<double>::from({1.0, 2.0, 3.0});
+   auto itarget = sequence<int>::from({3, 2, 1});
+
+   // When
+   auto actual = dtarget.inner_product(itarget);
+
+   // Then
+   ASSERT_DOUBLE_EQ(10.0, actual);
+}
+
+
+TEST(from, produces_identical_sequence) {
+   // Given
+   std::vector<short> expected = { 1, 2, 3, 9, 8, 7 };
+   auto target = sequence<short>::from(expected);
+
+   // When
+   bool actual = std::equal(target.begin(), target.end(), expected.begin());
+
+   // Then
+   ASSERT_TRUE(actual);
+}
+
+
+TEST(select_many, extracts_single_value_to_many) {
+   // Given
+   const char expected[] = "hello world";
+   std::vector<std::string> strings = { "hello", " ", "world" };
+   auto string_seq = sequence<std::string>::from(strings);
+   auto target = string_seq.select_many([](std::string s) { return sequence<char>::from(s); });
+
+   // When
+   bool actual = std::equal(target.begin(), target.end(), std::begin(expected));
+
+   // Then
+   ASSERT_TRUE(actual);
 }
 
 }

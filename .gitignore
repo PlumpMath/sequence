@@ -19,3 +19,8 @@
 *.exe
 *.out
 *.app
+test/sequence_test
+
+# Editor swap files
+*~
+.*.swp

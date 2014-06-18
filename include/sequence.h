@@ -10,6 +10,20 @@
 template<class> class sequence;
 
 
+namespace details_ {
+
+template<class T, class Transform>
+class select_many_helper {
+   typedef decltype(std::declval<Transform>()(std::declval<T>())) transform_result_sequence;
+
+public:
+   typedef decltype(std::declval<transform_result_sequence>().first()) element_type;
+   typedef sequence<element_type> sequence_type;
+};
+
+}
+
+
 template<class T>
 class sequence_iterator : public std::iterator<std::input_iterator_tag, T> {
    friend class sequence<T>;
@@ -30,12 +44,12 @@ public:
       return sequence_iterator(iter++);
    }
 
-   inline bool operator==(const sequence_iterator &rhs) {
-      return iter == rhs.iter;
+   inline bool operator==(const sequence_iterator &rhs) const {
+      return const_cast<sequence_iterator &>(*this).iter == const_cast<sequence_iterator &>(rhs).iter;
    }
 
-   inline bool operator!=(const sequence_iterator &rhs) {
-      return iter != rhs.iter;
+   inline bool operator!=(const sequence_iterator &rhs) const {
+      return const_cast<sequence_iterator &>(*this).iter != const_cast<sequence_iterator &>(rhs).iter;
    }
 
 private:
@@ -50,11 +64,13 @@ private:
 
 template<class T>
 class sequence {
+   template<class U> friend class sequence;
    typedef boost::coroutines::coroutine<T()> coro_t;
 
 public:
    typedef sequence_iterator<T> iterator;
    typedef sequence_iterator<T> const_iterator;
+   typedef typename coro_t::caller_type sink_type;
 
    sequence() = delete;
    sequence(sequence &&) = default;
@@ -85,41 +101,126 @@ public:
    }
 
    template<class Predicate>
-   inline bool any(Predicate predicate) {
-      for (auto t : *coro) {
-         if (predicate(t)) {
-            return true;
-         }
-      }
-      return false;
+   inline bool any(Predicate predicate) const {
+      auto iter = std::find_if(begin(), end(), predicate);
+      return iter != end();
    }
 
    template<class Predicate>
-   inline bool all(Predicate predicate) {
-      for (auto t : *coro) {
-         if (!predicate(t)) {
-            return false;
-         }
+   inline bool all(Predicate predicate) const {
+      auto iter = std::find_if(begin(), end(), [predicate](const T &t) { return !predicate(t); });
+      return iter == end();
+   }
+
+   inline T first() const {
+      auto iter = begin();
+      if (iter == end()) {
+         throw std::range_error("First cannot be computed on empty sequence.");
       }
-      return true;
+      return *iter;
+   }
+
+   inline T first_or_default(const T &default_value=T()) const {
+      auto iter = begin();
+      if (iter == end()) {
+         return default_value;
+      }
+      return *iter;
+   }
+
+   inline T last() const {
+      auto i = begin();
+      auto e = end();
+      if (i == e) {
+         throw std::range_error("Last cannot be computed on empty sequence.");
+      }
+
+      T result = *i;
+      for (++i; i != e; ++i) {
+         result = *i;
+      }
+      return result;
+   }
+
+   inline T last_or_default(T default_value=T()) const {
+      for (auto i = begin(); i != end(); ++i) {
+         default_value = *i;
+      }
+      return default_value;
+   }
+
+   inline bool contains(const T &value) const {
+      return std::find(begin(), end(), value) != end();
+   }
+
+   inline std::size_t count() const {
+      return static_cast<std::size_t>(std::distance(begin(), end()));
+   }
+
+   template<class Predicate>
+   inline std::size_t count(Predicate predicate) const {
+      return std::count_if(begin(), end(), predicate);
+   }
+
+   template<class U>
+   inline sequence<std::pair<T, U>> zip_with(const sequence<U> &other) const {
+      auto t_coro = this->coro;
+      auto u_coro = other.coro;
+      return sequence<std::pair<T, U>>([t_coro, u_coro](typename sequence<std::pair<T, U>>::coro_t::caller_type &put) {
+            auto ti = boost::begin(*t_coro);
+            auto tend = boost::end(*t_coro);
+            auto ui = boost::begin(*u_coro);
+            auto uend = boost::end(*u_coro);
+
+            while (ti != tend && ui != uend) {
+               put({ *ti++, *ui++ });
+            }
+         });
+   }
+
+   inline sequence<std::pair<T, T>> pairwise(bool capture_remainder=false) {
+      auto co = this->coro;
+      return sequence<std::pair<T, T>>([co, capture_remainder](typename sequence<std::pair<T, T>>::coro_t::caller_type &put) {
+            auto i = boost::begin(*co);
+            auto e = boost::end(*co);
+
+            while (i != e) {
+               T first = *i++;
+               if (i != e) {
+                  put({ first, *i++ });
+               }
+               else if (capture_remainder) {
+                  put({ first, T() });
+               }
+            }
+         });
    }
 
    template<class Comp=std::less<T>>
    inline T max(Comp comp=Comp()) const {
       auto iter = std::max_element(begin(), end(), comp);
       if (iter == end()) {
-         throw std::domain_error("Max cannot be computed on empty sequence.");
+         throw std::range_error("Max cannot be computed on empty sequence.");
       }
       return *iter;
    }
 
    template<class Comp=std::less<T>>
-   inline T min(Comp comp=Comp()) {
+   inline T min(Comp comp=Comp()) const {
       auto iter = std::min_element(begin(), end(), comp);
       if (iter == end()) {
-         throw std::domain_error("Min cannot be computed on empty sequence.");
+         throw std::range_error("Min cannot be computed on empty sequence.");
       }
       return *iter;
+   }
+
+   template<class Comp=std::less<T>>
+   inline std::pair<T, T> minmax(Comp comp=Comp()) {
+      auto p = std::min_element(begin(), end(), comp);
+      if (p.first == end()) {
+         throw std::range_error("Min-Max cannot be computed on empty sequence.");
+      }
+      return { *p.first, *p.second };
    }
 
    template<class Add=std::plus<T>>
@@ -127,33 +228,164 @@ public:
       return std::accumulate(begin(), end(), initial, add);
    }
 
+   template<class U, class R=typename std::common_type<T, U>::type, class BinOp2=std::multiplies<typename std::common_type<T, U>::type>,
+            class BinOp1=std::plus<typename std::common_type<T, U>::type>>
+   inline R inner_product(const sequence<U> &rhs, R init=R(), BinOp1 binOp1=BinOp1(), BinOp2 binOp2=BinOp2()) const {
+      return std::inner_product(begin(), end(), rhs.begin(), init, binOp1, binOp2);
+   }
+
+   template<class Transform>
+   inline sequence<decltype(std::declval<Transform>()(std::declval<T>()))> select(Transform transform) {
+      typedef sequence<decltype(transform(std::declval<T>()))> result_sequence;
+      auto co = coro;
+      return result_sequence([co, transform](typename result_sequence::coro_t::caller_type &put) {
+            for (const T &t : *co) {
+               put(transform(t));
+            }
+         });
+   }
+
+   template<class Transform>
+   inline sequence<typename details_::select_many_helper<T, Transform>::element_type> select_many(Transform transform) {
+      typedef typename details_::select_many_helper<T, Transform>::sequence_type result_sequence;
+      auto co = coro;
+      return result_sequence([co, transform](typename result_sequence::coro_t::caller_type &put) {
+            for (const T &t : *co) {
+               for (const auto &s : transform(t)) {
+                  put(s);
+               }
+            }
+         });
+   }
+
    template<class Predicate>
    inline sequence<T> where(Predicate predicate) {
       auto co = coro;
-      auto f = [co, predicate](typename coro_t::caller_type &ca) {
+      auto f = [co, predicate](typename coro_t::caller_type &put) {
             for (const T &t : *co) {
                if (predicate(t)) {
-                  ca(t);
+                  put(t);
                }
             }
          };
       return sequence<T>(std::move(f));
    }
 
-   static inline typename std::enable_if<std::is_arithmetic<T>::value, sequence<T>>::type range(T start, T finish, T delta=1) {
+   inline sequence<T> concat(const sequence<T> &other) {
+      auto l_co = coro;
+      auto r_co = other.coro;
+      return sequence<T>([l_co, r_co](typename coro_t::caller_type &put) {
+            for (const T &t : *l_co) {
+               put(t);
+            }
+            for (const T &t : *r_co) {
+               put(t);
+            }
+         });
+   }
+
+   inline sequence<T> take(std::size_t n) {
+      auto co = coro;
+      return sequence<T>([co, n](typename coro_t::caller_type &put) {
+            std::size_t i = 0;
+            auto iter = boost::begin(*co);
+            auto eiter = boost::end(*co);
+
+            while (i < n && iter != eiter) {
+               put(*iter);
+               ++iter; ++i;
+            }
+         });
+   }
+
+   template<class Predicate>
+   inline sequence<T> take_while(Predicate predicate) {
+      auto co = coro;
+      return sequence<T>([co, predicate](typename coro_t::caller_type &put) {
+            auto i = boost::begin(*co);
+            auto iend = boost::end(*co);
+
+            while (i != iend && predicate(*i)) {
+               put(*i++);
+            }
+         });
+   }
+
+   inline sequence<T> skip(std::size_t n) {
+      auto co = coro;
+      return sequence<T>([co, n](typename coro_t::caller_type &put) {
+            std::size_t i = 0;
+            auto iter = boost::begin(*co);
+            auto eiter = boost::end(*co);
+
+            while (i < n && iter != eiter) {
+               ++iter; ++i;
+            }
+
+            while (i != iend) {
+               put(*i);
+            }
+         });
+   }
+
+   template<class Predicate>
+   inline sequence<T> skip_while(Predicate predicate) {
+      auto co = coro;
+      return sequence<T>([co, predicate](typename coro_t::caller_type &put) {
+            auto i = boost::begin(*co);
+            auto iend = boost::end(*co);
+
+            while (i != iend && predicate(*i)) {
+               ++i;
+            }
+
+            while (i != iend) {
+               put(*i);
+            }
+         });
+   }
+
+   template<class Container>
+   static inline sequence<T> from(Container & c) {
+      return from(std::begin(c), std::end(c));
+   }
+
+   static inline sequence<T> from(const std::initializer_list<T> &l) {
+      return from(std::begin(l), std::end(l));
+   }
+
+   template<class InputIterator>
+   static inline sequence<T> from(InputIterator b, InputIterator e) {
+      return sequence<T>([b, e](typename coro_t::caller_type &put) {
+            for (auto i = b; i != e; ++i) {
+               put(*i);
+            }
+         });
+   }
+
+   template<class Generator>
+   static inline sequence<T> generate(Generator generate, std::size_t n) {
+      return sequence<T>([generate, n](typename coro_t::caller_type &put) {
+            for (std::size_t i = 0; i < n; ++i) {
+               put(generate());
+            }
+         });
+   }
+
+   static inline sequence<T> range(T start, T finish, T delta=1) {
       check_delta(delta, std::is_signed<T>());
 
       if (start < finish) {
-         return sequence<T>([start, finish, delta](typename coro_t::caller_type &ca) {
+         return sequence<T>([start, finish, delta](typename coro_t::caller_type &put) {
                for (T i = start; i < finish; i+=delta) {
-                  ca(i);
+                  put(i);
                }
             });
       }
       else if (finish < start) {
-         return sequence<T>([start, finish, delta](typename coro_t::caller_type &ca) {
+         return sequence<T>([start, finish, delta](typename coro_t::caller_type &put) {
                for (T i = start; i > finish; i-=delta) {
-                  ca(i);
+                  put(i);
                }
             });
       }
