@@ -5,6 +5,6 @@ test : sequence_test
 	./sequence_test
 
 clean:
-	rm -f sequence_test
+	rm -f sequence_test callgrind.out.*
 
 .PHONY: test clean
