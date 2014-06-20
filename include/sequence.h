@@ -165,7 +165,7 @@ public:
 
    template<class Predicate>
    inline std::size_t count(Predicate predicate) {
-      return std::count_if(begin(), end(), predicate);
+      return std::count_if(begin(), end(), std::move(predicate));
    }
 
    template<class U>
@@ -220,14 +220,16 @@ public:
       return *iter;
    }
 
+#if 0
    template<class Comp=std::less<T>>
    inline std::pair<T, T> minmax(Comp comp=Comp()) {
-      auto p = std::min_element(begin(), end(), comp);
+      auto p = std::minmax_element(begin(), end(), comp);
       if (p.first == end()) {
          throw std::range_error("Min-Max cannot be computed on empty sequence.");
       }
       return { *p.first, *p.second };
    }
+#endif
 
    template<class Add=std::plus<T>>
    inline T sum(T initial=T(), Add add=Add()) {
@@ -242,9 +244,10 @@ public:
 
    template<class Transform>
    inline sequence<decltype(std::declval<Transform>()(std::declval<T>()))> select(Transform transform) {
-      typedef sequence<decltype(transform(std::declval<T>()))> result_sequence;
+      typedef typename std::result_of<Transform(T)>::type result_type;
+      typedef sequence<result_type> result_sequence;
       auto co = coro;
-      return result_sequence([co, transform](typename result_sequence::coro_t::caller_type &put) {
+      return result_sequence([co, transform](typename result_sequence::sink_type &put) {
             for (const T &t : *co) {
                put(transform(t));
             }
@@ -373,7 +376,7 @@ public:
       return from(std::begin(c), std::end(c));
    }
 
-   static inline sequence<T> from(const std::initializer_list<T> &l) {
+   static inline sequence<T> from(std::initializer_list<T> l) {
       return from(std::begin(l), std::end(l));
    }
 

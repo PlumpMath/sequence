@@ -5,80 +5,10 @@
 
 namespace {
 
-TEST(range, increments_across_start_to_finish) {
-   // Given
-   const int start = 0;
-   const int finish = 10;
-   RecordProperty("start", start);
-   RecordProperty("finish", finish);
-   int expected = start;
 
-   // When
-   auto target = sequence<int>::range(start, finish);
+struct A { std::string a; };
 
-   // Then
-   for (int actual : target) {
-      ASSERT_EQ(expected, actual);
-      ++expected;
-   }
-}
-
-
-TEST(range, increments_until_finishes_at_finish_value) {
-   // Given
-   const int start = 0;
-   const int finish = 10;
-   RecordProperty("start", start);
-   RecordProperty("finish", finish);
-   int actual = start;
-   auto target = sequence<int>::range(start, finish);
-
-   // When
-   for (int ignore : target) {
-      ++actual;
-   }
-
-   // Then
-   ASSERT_EQ(finish, actual);
-}
-
-
-TEST(range, decrements_across_start_to_finish) {
-   // Given
-   const int start = 10;
-   const int finish = 0;
-   RecordProperty("start", start);
-   RecordProperty("finish", finish);
-   int expected = start;
-
-   // When
-   auto target = sequence<int>::range(start, finish);
-
-   // Then
-   for (int actual : target) {
-      ASSERT_EQ(expected, actual);
-      --expected;
-   }
-}
-
-
-TEST(range, decrements_until_finishes_at_finish) {
-   // Given
-   const int start = 10;
-   const int finish = 0;
-   RecordProperty("start", start);
-   RecordProperty("finish", finish);
-   int actual = start;
-   auto target = sequence<int>::range(start, finish);
-
-   // When
-   for (int ignore : target) {
-      --actual;
-   }
-
-   // Then
-   ASSERT_EQ(finish, actual);
-}
+inline bool operator==(const A &l, const A &r) { return l.a == r.a; }
 
 
 TEST(any, finds_at_least_one_value_that_holds_true) {
@@ -309,49 +239,123 @@ TEST(contains, returns_true_when_sequence_has_item) {
 }
 
 
-TEST(where, filters_out_uninteresting_values) {
+TEST(count, is_0_when_sequence_is_empty) {
    // Given
-   const int start = 0;
-   const int finish = 10;
-   RecordProperty("start", start);
-   RecordProperty("finish", finish);
-   int expected = start;
+   auto target = sequence<std::string>::empty_sequence();
 
    // When
-   auto target = sequence<int>::range(start, finish)
-                     .where([](int x) { return x % 2 == 0; });
+   std::size_t actual = target.count();
 
    // Then
-   for (int actual : target) {
-      ASSERT_EQ(expected, actual);
-      expected += 2;
-   }
+   ASSERT_EQ(0, actual);
 }
 
 
-TEST(empty_sequence, does_not_iterate) {
+TEST(count, reflects_number_of_elements_in_sequence) {
    // Given
-   std::size_t invocations = 0;
+   std::vector<std::string> vec = { "hello", " ", "world" };
+   auto target = sequence<std::string>::from(vec);
 
    // When
-   for (int ignored : sequence<int>::empty_sequence()) {
-      ++invocations;
-   }
+   std::size_t actual = target.count();
 
    // Then
-   ASSERT_EQ(0, invocations);
+   ASSERT_EQ(3, actual);
 }
 
 
-TEST(empty_sequence, is_empty) {
+TEST(count, only_counts_the_elements_matching_the_predicate) {
    // Given
-   auto target = sequence<float>::empty_sequence();
+   std::vector<std::string> vec = { "hello", " ", "world", "foo", "bar" };
+   auto target = sequence<std::string>::from(vec);
 
    // When
-   bool actual = target.empty();
+   std::size_t actual = target.count([](const std::string &s) { return s.size() == 3; });
 
    // Then
-   ASSERT_TRUE(actual);
+   ASSERT_EQ(2, actual);
+}
+
+
+TEST(zip_with, produces_a_sequence_with_same_number_of_elements_as_pairs) {
+   // Given
+   std::vector<std::string> svec = { "hello", " ", "world" };
+   std::vector<int> ivec = { 1, 2, 3 };
+   auto sseq = sequence<std::string>::from(svec);
+   auto iseq = sequence<int>::from(ivec);
+
+   // When
+   auto target = iseq.zip_with(sseq);
+
+   // Then
+   ASSERT_EQ(3, target.count());
+}
+
+
+TEST(zip_with, produces_a_sequence_with_same_elements_as_pairs) {
+   // Given
+   std::vector<std::string> svec = { "foo", "baz" };
+   std::vector<int> ivec = { 10, -3 };
+   auto sseq = sequence<std::string>::from(svec);
+   auto iseq = sequence<int>::from(ivec);
+   std::vector<std::pair<int, std::string>> expected = { { 10, "foo" }, { -3, "baz" } };
+
+   // When
+   auto target = iseq.zip_with(sseq);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), target.begin()));
+}
+
+
+TEST(pairwise, reduces_sequence_by_half) {
+   // Given
+   auto s = sequence<double>::range(-1.0, 1.0, 0.5);
+
+   // When
+   auto target = s.pairwise();
+
+   // Then
+   ASSERT_EQ(2, target.count());
+}
+
+
+TEST(pairwise, produces_pairs_of_the_generating_sequence) {
+   // Given
+   auto s = sequence<char>::from("beer");
+   std::vector<std::pair<char, char>> expected = { { 'b', 'e' }, { 'e', 'r' } };
+
+   // When
+   auto target = s.pairwise();
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), target.begin()));
+}
+
+
+TEST(pairwise, truncates_remaining_element_by_default) {
+   // Given
+   auto s = sequence<char>::from("beers");
+   std::vector<std::pair<char, char>> expected = { { 'b', 'e' }, { 'e', 'r' } };
+
+   // When
+   auto target = s.pairwise();
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), target.begin()));
+}
+
+
+TEST(pairwise, captures_remainder_when_specified_to_do_so) {
+   // Given
+   auto s = sequence<char>::from("beers");
+   std::vector<std::pair<char, char>> expected = { { 'b', 'e' }, { 'e', 'r' }, { 's', '\0' } };
+
+   // When
+   auto target = s.pairwise();
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), target.begin()));
 }
 
 
@@ -403,6 +407,86 @@ TEST(min, throws_domain_error_on_empty_sequence) {
 }
 
 
+#if 0
+TEST(minmax, provides_pair_with_minimum_and_maximum_value) {
+   // Given
+   auto target = sequence<float>::range(7.0f, 5.0f, 0.25f);
+   float expected_min = 5.25f;
+   float expected_max = 7.00f;
+
+   // When
+   std::pair<float, float> actual = target.minmax();
+
+   // Then
+   ASSERT_FLOAT_EQ(expected_min, actual.first);
+   ASSERT_FLOAT_EQ(expected_max, actual.second);
+}
+
+
+TEST(minmax, throws_range_error_on_empty_sequence) {
+   // Given
+   auto target = sequence<int>::empty_sequence();
+
+   // When
+   ASSERT_THROW(target.minmax(), std::range_error);
+}
+#endif
+
+
+TEST(sum, provides_total_of_all_elements) {
+   // Given
+   std::vector<std::string> svec = { "Andrew", " ", "Ford" };
+   auto target = sequence<std::string>::from(svec);
+   std::string expected = "Andrew Ford";
+
+   // When
+   auto actual = target.sum();
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(sum, provides_total_of_all_elements_beginning_with_initial_value) {
+   // Given
+   std::vector<std::string> svec = { " ", "Ford" };
+   auto target = sequence<std::string>::from(svec);
+   std::string expected = "Andrew Ford";
+
+   // When
+   auto actual = target.sum("Andrew");
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(sum, uses_provided_binary_operation) {
+   // Given
+   auto target = sequence<std::uint16_t>::range(3, 0);
+   std::uint16_t expected = 6;
+
+   // When
+   auto actual = target.sum(1, std::multiplies<std::uint16_t>());
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
+TEST(sum, uses_provided_initial_value_and_binary_operation) {
+   // Given
+   auto target = sequence<std::uint16_t>::range(3, 0);
+   std::uint16_t expected = 12;
+
+   // When
+   auto actual = target.sum(2, std::multiplies<std::uint16_t>());
+
+   // Then
+   ASSERT_EQ(expected, actual);
+}
+
+
 TEST(inner_product, resolves_type_correctly) {
    // Given
    auto dtarget = sequence<double>::from({1.0, 2.0, 3.0});
@@ -429,31 +513,81 @@ TEST(inner_product, calculates_correctly) {
 }
 
 
-TEST(from, produces_identical_sequence) {
+TEST(select, projects_into_new_type) {
    // Given
-   std::vector<short> expected = { 1, 2, 3, 9, 8, 7 };
-   auto target = sequence<short>::from(expected);
+   std::vector<A> avec = { { "blammo" }, { "booyah" }, { "huzah" } };
+   auto target = sequence<A>::from(avec);
+   std::vector<std::string> expected = { "blammo", "booyah", "huzah" };
 
    // When
-   bool actual = std::equal(target.begin(), target.end(), expected.begin());
+   // Note: Explicitly setting the actual type rather than using auto to ensure
+   //       that the resulting type is what we want (we'll get compiler errors
+   //       if it isn't).
+   sequence<std::string> actual = target.select([](const A &a) { return a.a; });
 
    // Then
-   ASSERT_TRUE(actual);
+   ASSERT_TRUE(std::equal(std::begin(expected), std::end(expected), actual.begin()));
 }
 
 
 TEST(select_many, extracts_single_value_to_many) {
    // Given
-   const char expected[] = "hello world";
+   std::string expected = "hello world";
    std::vector<std::string> strings = { "hello", " ", "world" };
-   auto string_seq = sequence<std::string>::from(strings);
-   auto target = string_seq.select_many([](std::string s) { return sequence<char>::from(s); });
+   auto target = sequence<std::string>::from(strings);
 
    // When
-   bool actual = std::equal(target.begin(), target.end(), std::begin(expected));
+   auto actual = target.select_many([](std::string s) { return sequence<char>::from(s); });
 
    // Then
-   ASSERT_TRUE(actual);
+   ASSERT_TRUE(std::equal(std::begin(expected), std::end(expected), actual.begin()));
+}
+
+
+TEST(where, filters_out_uninteresting_values) {
+   // Given
+   const int start = 0;
+   const int finish = 10;
+   RecordProperty("start", start);
+   RecordProperty("finish", finish);
+   int expected = start;
+
+   // When
+   auto target = sequence<int>::range(start, finish)
+                     .where([](int x) { return x % 2 == 0; });
+
+   // Then
+   for (int actual : target) {
+      ASSERT_EQ(expected, actual);
+      expected += 2;
+   }
+}
+
+
+TEST(concat, appends_to_sequence) {
+   // Given
+   auto arg = sequence<int>::range(3, 6);
+   auto target = sequence<int>::range(0, 3);
+   std::vector<int> ivec = { 0, 1, 2, 3, 4, 5 };
+
+   // When
+   auto actual = target.concat(arg);
+
+   // Then
+   ASSERT_TRUE(std::equal(ivec.begin(), ivec.end(), actual.begin()));
+}
+
+
+TEST(take, returns_first_n_elements) {
+  // Given
+  std::vector<int> ivec = { 1, 2, 3 };
+  auto target = sequence<int>::from({1, 2, 3, 4, 5, 6});
+
+  // When
+  auto actual = target.take(3);
+
+  // Then
+  ASSERT_TRUE(std::equal(ivec.begin(), ivec.end(), actual.begin()));
 }
 
 
@@ -466,6 +600,70 @@ TEST(take, returns_all_elements_when_n_is_greater_than_number_of_elements) {
 
   // Then
   ASSERT_EQ(6, actual);
+}
+
+
+TEST(take, is_empty_after_exhausting_all_elements) {
+  // Given
+  auto target = sequence<int>::from({1, 2, 3, 4, 5, 6}).take(0);
+
+  // When
+  bool actual = target.empty();
+
+  // Then
+  ASSERT_TRUE(actual);
+}
+
+
+TEST(take_while, stops_taking_elements_after_predicate_fails) {
+  // Given
+  std::vector<int> ivec = { 1, 2, 3 };
+  auto target = sequence<int>::from({1, 2, 3, 4, 5, 6});
+
+  // When
+  auto actual = target.take_while([](int x) { return (x % 7) < 4; });
+
+  // Then
+  ASSERT_TRUE(std::equal(ivec.begin(), ivec.end(), actual.begin()));
+}
+
+
+TEST(skip, skips_first_n_elements) {
+   // Given
+   std::string s = "foobar";
+   auto target = sequence<char>::from(s);
+
+   // When
+   auto actual = target.skip(3);
+
+   // Then
+   ASSERT_TRUE(std::equal(s.begin() + 3, s.end(), actual.begin()));
+}
+
+
+TEST(skip, produces_empty_sequence_when_there_are_not_enough_elements_to_skip) {
+   // Given
+   std::string s = "foobar";
+   auto target = sequence<char>::from(s);
+
+   // When
+   auto actual = target.skip(30);
+
+   // Then
+   ASSERT_TRUE(actual.empty());
+}
+
+
+TEST(skip_while, skips_until_predicate_fails) {
+   // Given
+   std::string s = "foobar";
+   auto target = sequence<char>::from(s);
+
+   // When
+   auto actual = target.skip_while([](char c) { return c != 'b'; });
+
+   // Then
+   ASSERT_TRUE(std::equal(s.begin() + 3, s.end(), actual.begin()));
 }
 
 
@@ -517,28 +715,14 @@ TEST(page, returns_remaining_elements_on_last_page_with_smaller_than_page_size) 
 }
 
 
-TEST(except, properly_performs_set_difference) {
-   // Given
-   auto l = sequence<int>::range(0, 15);
-   auto r = sequence<int>::range(0, 15).where([](int x) { return x % 2 == 1; });
-   auto expected = { 0, 2, 4, 6, 8, 10, 12, 14 };
-
-   // When
-   auto actual = l.except(r);
-
-   // Then
-   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
-}
-
-
-TEST(symmetric_differency, properly_performs_set_difference) {
+TEST(union_with, properly_performs_union) {
    // Given
    auto l = sequence<int>::range(7, 15);
    auto r = sequence<int>::range(0, 10);
-   auto expected = { 0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14 };
+   auto expected = sequence<int>::range(0, 15);
 
    // When
-   auto actual = l.symmetric_difference(r);
+   auto actual = l.union_with(r);
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
@@ -559,17 +743,191 @@ TEST(intersect_with, properly_performs_intersection) {
 }
 
 
-TEST(union_with, properly_performs_union) {
+TEST(except, properly_performs_set_difference) {
    // Given
-   auto l = sequence<int>::range(7, 15);
-   auto r = sequence<int>::range(0, 10);
-   auto expected = sequence<int>::range(0, 15);
+   auto l = sequence<int>::range(0, 15);
+   auto r = sequence<int>::range(0, 15).where([](int x) { return x % 2 == 1; });
+   auto expected = { 0, 2, 4, 6, 8, 10, 12, 14 };
 
    // When
-   auto actual = l.union_with(r);
+   auto actual = l.except(r);
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(symmetric_difference, properly_performs_set_difference) {
+   // Given
+   auto l = sequence<int>::range(7, 15);
+   auto r = sequence<int>::range(0, 10);
+   auto expected = { 0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14 };
+
+   // When
+   auto actual = l.symmetric_difference(r);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(from, produces_identical_sequence_as_container) {
+   // Given
+   std::vector<short> expected = { 1, 2, 3, 9, 8, 7 };
+
+   // When
+   auto actual = sequence<short>::from(expected);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(from, produces_identical_sequence_as_iterator_range) {
+   // Given
+   std::vector<short> expected = { 1, 2, 3, 9, 8, 7 };
+
+   // When
+   auto actual = sequence<short>::from(std::begin(expected), std::end(expected));
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(from, produces_identical_sequence_as_initializer_list) {
+   // Given
+   std::vector<short> expected = { 1, 2, 3, 9, 8, 7 };
+
+   // When
+   auto actual = sequence<short>::from({ 1, 2, 3, 9, 8, 7 });
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(generate, produces_a_sequence_with_n_elements) {
+   // Given
+   int x = std::rand() % 53;
+   const int start = x;
+   std::size_t n = (std::rand() % 13) + 3;
+   RecordProperty("start", x);
+   RecordProperty("size", n);
+   auto generator = [&x]() { return x++; };
+
+   // When
+   auto actual = sequence<int>::generate(generator, n);
+
+   // Then
+   // Note: We need to test the entire sequence including end-state.
+   auto aiter = actual.begin();
+   for (std::size_t i = 0; i < n && aiter != actual.end(); ++i, ++aiter) {
+      ASSERT_EQ(start + i, *aiter);
+   }
+   ASSERT_TRUE(actual.empty());
+}
+
+
+TEST(range, increments_across_start_to_finish) {
+   // Given
+   const int start = 0;
+   const int finish = 10;
+   RecordProperty("start", start);
+   RecordProperty("finish", finish);
+   int expected = start;
+
+   // When
+   auto target = sequence<int>::range(start, finish);
+
+   // Then
+   for (int actual : target) {
+      ASSERT_EQ(expected, actual);
+      ++expected;
+   }
+}
+
+
+TEST(range, increments_until_finishes_at_finish_value) {
+   // Given
+   const int start = 0;
+   const int finish = 10;
+   RecordProperty("start", start);
+   RecordProperty("finish", finish);
+   int actual = start;
+   auto target = sequence<int>::range(start, finish);
+
+   // When
+   for (int ignore : target) {
+      ++actual;
+   }
+
+   // Then
+   ASSERT_EQ(finish, actual);
+}
+
+
+TEST(range, decrements_across_start_to_finish) {
+   // Given
+   const int start = 10;
+   const int finish = 0;
+   RecordProperty("start", start);
+   RecordProperty("finish", finish);
+   int expected = start;
+
+   // When
+   auto target = sequence<int>::range(start, finish);
+
+   // Then
+   for (int actual : target) {
+      ASSERT_EQ(expected, actual);
+      --expected;
+   }
+}
+
+
+TEST(range, decrements_until_finishes_at_finish) {
+   // Given
+   const int start = 10;
+   const int finish = 0;
+   RecordProperty("start", start);
+   RecordProperty("finish", finish);
+   int actual = start;
+   auto target = sequence<int>::range(start, finish);
+
+   // When
+   for (int ignore : target) {
+      --actual;
+   }
+
+   // Then
+   ASSERT_EQ(finish, actual);
+}
+
+
+TEST(empty_sequence, does_not_iterate) {
+   // Given
+   std::size_t invocations = 0;
+
+   // When
+   for (int ignored : sequence<int>::empty_sequence()) {
+      ++invocations;
+   }
+
+   // Then
+   ASSERT_EQ(0, invocations);
+}
+
+
+TEST(empty_sequence, is_empty) {
+   // Given
+   auto target = sequence<float>::empty_sequence();
+
+   // When
+   bool actual = target.empty();
+
+   // Then
+   ASSERT_TRUE(actual);
 }
 
 }
