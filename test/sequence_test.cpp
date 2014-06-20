@@ -203,6 +203,63 @@ TEST(last_or_default, returns_provided_default_value_when_the_sequence_is_empty)
 }
 
 
+TEST(element_at, returns_the_element_at_the_given_index) {
+   // Given
+   auto target = sequence<int>::from({ 3, 4, 8 });
+
+   // When
+   int actual = target.element_at(1);
+
+   // Then
+   ASSERT_EQ(4, actual);
+}
+
+
+TEST(element_at, throws_range_error_when_there_is_no_element_at_the_index) {
+   // Given
+   auto target = sequence<int>::from({ 3, 4, 8 });
+
+   // When
+   ASSERT_THROW(target.element_at(4), std::range_error);
+}
+
+
+TEST(element_at_or_default, returns_the_element_at_the_given_index) {
+   // Given
+   auto target = sequence<int>::from({ 3, 4, 8 });
+
+   // When
+   int actual = target.element_at_or_default(1);
+
+   // Then
+   ASSERT_EQ(4, actual);
+}
+
+
+TEST(element_at_or_default, returns_default_value_when_there_is_no_element_at_the_index) {
+   // Given
+   auto target = sequence<int>::from({ 3, 4, 8 });
+
+   // When
+   auto actual = target.element_at_or_default(4);
+
+   // Then
+   ASSERT_EQ(int(), actual);
+}
+
+
+TEST(element_at_or_default, returns_provided_default_value_when_there_is_no_element_at_the_index) {
+   // Given
+   auto target = sequence<int>::from({ 3, 4, 8 });
+
+   // When
+   auto actual = target.element_at_or_default(4, 15);
+
+   // Then
+   ASSERT_EQ(15, actual);
+}
+
+
 TEST(contains, returns_false_on_empty_sequence) {
    // Given
    auto target = sequence<char>::empty_sequence();

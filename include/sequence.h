@@ -155,6 +155,19 @@ public:
       return default_value;
    }
 
+   inline T element_at(std::size_t index) {
+      try {
+         return skip(index).first();
+      }
+      catch (const std::range_error &) {
+         throw std::range_error("Element at index cannot be retrieved because there aren't enough elements in the sequence.");
+      }
+   }
+
+   inline T element_at_or_default(std::size_t index, T default_value=T()) {
+      return skip(index).first_or_default(default_value);
+   }
+
    inline bool contains(const T &value) {
       return std::find(begin(), end(), value) != end();
    }
