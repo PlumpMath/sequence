@@ -8,7 +8,20 @@ namespace {
 
 struct A { std::string a; };
 
+struct B { std::string a; int b; };
+struct C { std::string a; int c; };
+struct D { std::string a; int b; int c; };
+
 inline bool operator==(const A &l, const A &r) { return l.a == r.a; }
+inline bool operator==(const B &l, const B &r) { return l.a == r.a && l.b == r.b; }
+inline bool operator==(const C &l, const C &r) { return l.a == r.a && l.c == r.c; }
+inline bool operator==(const D &l, const D &r) { return l.a == r.a && l.b == r.b && l.c == r.c; }
+
+struct combine {
+   inline D operator()(const B &l, const C &r) const {
+      return { l.a, l.b, r.c };
+   }
+};
 
 
 TEST(any, finds_at_least_one_value_that_holds_true) {
@@ -951,6 +964,23 @@ TEST(symmetric_difference, properly_performs_set_difference) {
 
    // When
    auto actual = l.symmetric_difference(r);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(join, produces_inner_join_of_two_sequences) {
+   // Given
+   auto b = sequence<B>::from({ { "foo", 3 }, { "bar", 5 } });
+   auto c = sequence<C>::from({ { "foo", 7 }, { "foo", 25 } });
+   std::vector<D> expected = { { "foo", 3, 7 }, { "foo", 3, 25 } };
+
+   // When
+   sequence<D> actual = b.join(std::move(c),
+                               [](const B &b) { return b.a; },
+                               [](const C &c) { return c.a; },
+                               combine(), 4);
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));

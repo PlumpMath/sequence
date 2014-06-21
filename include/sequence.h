@@ -21,6 +21,17 @@ public:
    typedef sequence<element_type> sequence_type;
 };
 
+
+template<class T, class TSelector, class U, class USelector, class Combiner>
+class join_helper {
+   typedef decltype(std::declval<TSelector>()(std::declval<T>())) t_key_type;
+   typedef decltype(std::declval<USelector>()(std::declval<U>())) u_key_type;
+
+public:
+   typedef typename std::common_type<t_key_type, u_key_type>::type key_type;
+   typedef decltype(std::declval<Combiner>()(std::declval<T>(), std::declval<U>())) result_type;
+};
+
 }
 
 
@@ -426,6 +437,29 @@ public:
 
    template<class Comp=std::less<T>>
    inline sequence<T> symmetric_difference(const sequence<T> &other, Comp comp=Comp());
+
+   template<class TSelector, class USelector, class Combiner, class U, class Alloc=std::allocator<U>>
+   inline sequence<typename details_::join_helper<T, TSelector, U, USelector, Combiner>::result_type> join(
+         sequence<U> u, TSelector select_t, USelector select_u, Combiner combine, std::size_t reserve=0,
+         Alloc alloc=Alloc()) {
+      typedef typename details_::join_helper<T, TSelector, U, USelector, Combiner>::result_type result_type;
+      typedef typename sequence<result_type>::sink_type result_sink_type;
+
+      auto t_co = coro;
+      auto u_co = u.coro;
+      return sequence<result_type>([t_co, u_co, select_t, select_u, combine, reserve, alloc](result_sink_type &put) {
+            std::vector<U, Alloc> uvec(std::move(alloc));
+            uvec.reserve(reserve);
+            uvec.insert(uvec.end(), boost::begin(*u_co), boost::end(*u_co));
+            for (auto titer = boost::begin(*t_co), tend = boost::end(*t_co); titer != tend; ++titer) {
+               for (auto uiter = uvec.begin(), uend = uvec.end(); uiter != uend; ++uiter) {
+                  if (select_t(*titer) == select_u(*uiter)) {
+                     put(combine(*titer, *uiter));
+                  }
+               }
+            }
+         });
+   }
 
    template<class Container>
    static inline sequence<T> from(Container & c) {
