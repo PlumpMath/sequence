@@ -168,6 +168,21 @@ public:
       return skip(index).first_or_default(default_value);
    }
 
+   template<class Comp=std::less<T>, class Alloc=std::allocator<T>>
+   inline sequence<T> sort(std::size_t reserve=0, Comp comp=Comp(), Alloc alloc=Alloc()) {
+      auto co = coro;
+      return sequence<T>([co, reserve, comp, alloc](sink_type &put) {
+            std::vector<T, Alloc> v(alloc);
+            v.reserve(reserve);
+            v.insert(v.end(), boost::begin(*co), boost::end(*co));
+            std::sort(v.begin(), v.end(), comp);
+            std::for_each(v.begin(), v.end(), std::ref(put));
+         });
+   }
+
+   template<class Alloc=std::allocator<T>>
+   inline sequence<T> reverse(std::size_t reserve=0, Alloc alloc=Alloc());
+
    inline bool contains(const T &value) {
       return std::find(begin(), end(), value) != end();
    }
@@ -283,7 +298,7 @@ public:
    template<class Predicate>
    inline sequence<T> where(Predicate predicate) {
       auto co = coro;
-      auto f = [co, predicate](typename coro_t::caller_type &put) {
+      auto f = [co, predicate](sink_type &put) {
             for (const T &t : *co) {
                if (predicate(t)) {
                   put(t);
@@ -296,7 +311,7 @@ public:
    inline sequence<T> concat(const sequence<T> &other) {
       auto l_co = coro;
       auto r_co = other.coro;
-      return sequence<T>([l_co, r_co](typename coro_t::caller_type &put) {
+      return sequence<T>([l_co, r_co](sink_type &put) {
             for (const T &t : *l_co) {
                put(t);
             }
@@ -308,7 +323,7 @@ public:
 
    inline sequence<T> take(std::size_t n) {
       auto co = coro;
-      return sequence<T>([co, n](typename coro_t::caller_type &put) {
+      return sequence<T>([co, n](sink_type &put) {
             std::size_t i = 0;
             auto iter = boost::begin(*co);
             auto eiter = boost::end(*co);
@@ -323,7 +338,7 @@ public:
    template<class Predicate>
    inline sequence<T> take_while(Predicate predicate) {
       auto co = coro;
-      return sequence<T>([co, predicate](typename coro_t::caller_type &put) {
+      return sequence<T>([co, predicate](sink_type &put) {
             auto i = boost::begin(*co);
             auto iend = boost::end(*co);
 
@@ -335,7 +350,7 @@ public:
 
    inline sequence<T> skip(std::size_t n) {
       auto co = coro;
-      return sequence<T>([co, n](typename coro_t::caller_type &put) {
+      return sequence<T>([co, n](sink_type &put) {
             std::size_t i = 0;
             auto iter = boost::begin(*co);
             auto eiter = boost::end(*co);
@@ -353,7 +368,7 @@ public:
    template<class Predicate>
    inline sequence<T> skip_while(Predicate predicate) {
       auto co = coro;
-      return sequence<T>([co, predicate](typename coro_t::caller_type &put) {
+      return sequence<T>([co, predicate](sink_type &put) {
             auto i = boost::begin(*co);
             auto iend = boost::end(*co);
 
@@ -390,21 +405,21 @@ public:
    }
 
    static inline sequence<T> from(std::initializer_list<T> l) {
-      return from(std::begin(l), std::end(l));
+      return sequence<T>([l](sink_type &put) {
+            std::for_each(l.begin(), l.end(), std::ref(put));
+         });
    }
 
    template<class InputIterator>
    static inline sequence<T> from(InputIterator b, InputIterator e) {
-      return sequence<T>([b, e](typename coro_t::caller_type &put) {
-            for (auto i = b; i != e; ++i) {
-               put(*i);
-            }
+      return sequence<T>([b, e](sink_type &put) {
+            std::for_each(b, e, std::ref(put));
          });
    }
 
    template<class Generator>
    static inline sequence<T> generate(Generator generate, std::size_t n) {
-      return sequence<T>([generate, n](typename coro_t::caller_type &put) {
+      return sequence<T>([generate, n](sink_type &put) {
             for (std::size_t i = 0; i < n; ++i) {
                put(generate());
             }
@@ -415,14 +430,14 @@ public:
       check_delta(delta, std::is_signed<T>());
 
       if (start < finish) {
-         return sequence<T>([start, finish, delta](typename coro_t::caller_type &put) {
+         return sequence<T>([start, finish, delta](sink_type &put) {
                for (T i = start; i < finish; i+=delta) {
                   put(i);
                }
             });
       }
       else if (finish < start) {
-         return sequence<T>([start, finish, delta](typename coro_t::caller_type &put) {
+         return sequence<T>([start, finish, delta](sink_type &put) {
                for (T i = start; i > finish; i-=delta) {
                   put(i);
                }
@@ -433,7 +448,7 @@ public:
    }
 
    static inline sequence<T> empty_sequence() {
-      return sequence<T>([](typename coro_t::caller_type &){});
+      return sequence<T>([](sink_type &){});
    }
 
 private:
@@ -545,6 +560,19 @@ inline sequence<T> sequence<T>::symmetric_difference(const sequence<T> &other, C
          std::set_symmetric_difference(boost::begin(*l_co), boost::end(*l_co),
                                        boost::begin(*r_co), boost::end(*r_co),
                                        sequence_sink_iterator<T>(sink));
+      });
+}
+
+
+template<class T>
+template<class Alloc>
+inline sequence<T> sequence<T>::reverse(std::size_t reserve, Alloc alloc) {
+   auto co = coro;
+   return sequence<T>([co, reserve, alloc](sink_type &put) {
+         std::vector<T, Alloc> v(alloc);
+         v.reserve(reserve);
+         v.insert(v.end(), boost::begin(*co), boost::end(*co));
+         std::copy(v.rbegin(), v.rend(), sequence_sink_iterator<T>(put));
       });
 }
 

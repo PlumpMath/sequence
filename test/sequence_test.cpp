@@ -260,6 +260,45 @@ TEST(element_at_or_default, returns_provided_default_value_when_there_is_no_elem
 }
 
 
+TEST(sort, returns_sorted_sequence) {
+   // Given
+   auto target = sequence<int>::from({ 2, 3, 1, 4 });
+   std::vector<int> expected = { 1, 2, 3, 4 };
+
+   // When
+   auto actual = target.sort();
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(sort, returns_sorted_sequence_using_provided_comparator) {
+   // Given
+   auto target = sequence<int>::from({ 2, 3, 1, 4 });
+   std::vector<int> expected = { 4, 3, 2, 1 };
+
+   // When
+   auto actual = target.sort(4, std::greater<int>());
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
+TEST(reverse, returns_sequence_in_reverse_order) {
+   // Given
+   auto target = sequence<int>::from({ 2, 3, 1, 4 });
+   auto expected = { 4, 1, 3, 2 };
+
+   // When
+   auto actual = target.reverse(4);
+
+   // Then
+   ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
+}
+
+
 TEST(contains, returns_false_on_empty_sequence) {
    // Given
    auto target = sequence<char>::empty_sequence();
