@@ -260,6 +260,96 @@ TEST(element_at_or_default, returns_provided_default_value_when_there_is_no_elem
 }
 
 
+TEST(single, returns_only_element) {
+   // Given
+   auto target = sequence<int>::from({ 8 });
+
+   // When
+   auto actual = target.single();
+
+   // Then
+   ASSERT_EQ(8, actual);
+}
+
+
+TEST(single, throws_range_exception_when_sequence_is_empty) {
+   // Given
+   auto target = sequence<int>::empty_sequence();
+
+   // When
+   ASSERT_THROW(target.single(), std::range_error);
+}
+
+
+TEST(single, throws_range_exception_when_sequence_has_multiple_elements) {
+   // Given
+   auto target = sequence<int>::from({ 8, 7 });
+
+   // When
+   ASSERT_THROW(target.single(), std::range_error);
+}
+
+
+TEST(single_or_default, returns_only_element) {
+   // Given
+   auto target = sequence<int>::from({ 8 });
+
+   // When
+   auto actual = target.single_or_default();
+
+   // Then
+   ASSERT_EQ(8, actual);
+}
+
+
+TEST(single_or_default, returns_default_value_when_sequence_is_empty) {
+   // Given
+   auto target = sequence<int>::empty_sequence();
+
+   // When
+   auto actual = target.single_or_default();
+
+   // Then
+   ASSERT_EQ(int(), actual);
+}
+
+
+TEST(single_or_default, returns_provided_default_value_when_sequence_is_empty) {
+   // Given
+   auto target = sequence<int>::empty_sequence();
+
+   // When
+   auto actual = target.single_or_default(5);
+
+   // Then
+   ASSERT_EQ(5, actual);
+}
+
+
+TEST(single_or_default, returns_default_value_when_sequence_has_multiple_elements) {
+   // Given
+   auto target = sequence<int>::from({ 8, 7 });
+
+   // When
+   auto actual = target.single_or_default();
+
+   // Then
+   ASSERT_EQ(int(), actual);
+}
+
+
+TEST(single_or_default, returns_provided_default_value_when_sequence_has_multiple_elements) {
+   // Given
+   auto target = sequence<int>::from({ 8, 7 });
+
+   // When
+   auto actual = target.single_or_default(883);
+
+   // Then
+   ASSERT_EQ(883, actual);
+}
+
+
 TEST(sort, returns_sorted_sequence) {
    // Given
    auto target = sequence<int>::from({ 2, 3, 1, 4 });

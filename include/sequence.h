@@ -168,6 +168,34 @@ public:
       return skip(index).first_or_default(default_value);
    }
 
+   inline T single() {
+      auto iter = begin();
+      if (iter == end()) {
+         throw std::range_error("Cannot retrieve single result from empty sequence.");
+      }
+      T result = *iter++;
+
+      if (iter != end()) {
+         throw std::range_error("More than one element present in sequence.");
+      }
+
+      return std::move(result);
+   }
+
+   inline T single_or_default(T default_value=T()) {
+      auto iter = begin();
+      if (iter == end()) {
+         return default_value;
+      }
+      T result = *iter++;
+
+      if (iter != end()) {
+         return default_value;
+      }
+
+      return std::move(result);
+   }
+
    template<class Comp=std::less<T>, class Alloc=std::allocator<T>>
    inline sequence<T> sort(std::size_t reserve=0, Comp comp=Comp(), Alloc alloc=Alloc()) {
       auto co = coro;
