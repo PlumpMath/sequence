@@ -7,32 +7,15 @@
 #include <type_traits>
 
 
-template<class> class sequence;
-
-
 namespace details_ {
 
-template<class T, class Transform>
-class select_many_helper {
-   typedef decltype(std::declval<Transform>()(std::declval<T>())) transform_result_sequence;
-
-public:
-   typedef decltype(std::declval<transform_result_sequence>().first()) element_type;
-   typedef sequence<element_type> sequence_type;
-};
-
-
-template<class T, class TSelector, class U, class USelector, class Combiner>
-class join_helper {
-   typedef decltype(std::declval<TSelector>()(std::declval<T>())) t_key_type;
-   typedef decltype(std::declval<USelector>()(std::declval<U>())) u_key_type;
-
-public:
-   typedef typename std::common_type<t_key_type, u_key_type>::type key_type;
-   typedef decltype(std::declval<Combiner>()(std::declval<T>(), std::declval<U>())) result_type;
-};
+template<bool B, class T=void>
+using disable_if_t = std::enable_if_t<!B, T>;
 
 }
+
+
+template<class> class sequence;
 
 
 template<class T>
@@ -73,37 +56,60 @@ private:
 };
 
 
+template<class Op>
+class sequence_operation {
+   template<class T> friend class sequence;
+   Op op;
+
+public:
+   explicit inline sequence_operation(Op &&op_) :
+      op(std::move(op_))
+   {
+   }
+
+   sequence_operation(const sequence_operation<Op> &) = delete;
+   sequence_operation(sequence_operation<Op> &&) = default;
+
+   template<class S>
+   inline auto operator()(sequence<S> &&s) {
+      return op(std::move(s));
+   }
+};
+
+
+template<class F> inline sequence_operation<F> sequence_manipulator(F &&f) {
+   return sequence_operation<F>{std::move(f)};
+}
+
+
 template<class T>
 class sequence {
    template<class U> friend class sequence;
    typedef boost::coroutines::coroutine<T()> coro_t;
 
 public:
+   typedef T value_type;
    typedef sequence_iterator<T> iterator;
-   typedef sequence_iterator<T> const_iterator;
+   typedef std::size_t size_type;
    typedef typename coro_t::caller_type sink_type;
 
    template<class Fun>
-   explicit inline sequence(Fun f) :
+   explicit inline sequence(Fun &&f) :
       coro(std::make_shared<coro_t>(std::move(f)))
    {
    }
 
-   sequence() = delete;
+   sequence() :
+      sequence([](sink_type &) {})
+   {
+   }
+
    sequence(sequence &&) = default;
    sequence(const sequence &) = delete;
    ~sequence() = default;
 
    sequence & operator =(sequence &&) = default;
    sequence & operator =(const sequence &) = delete;
-
-   inline const_iterator begin() const {
-      return boost::begin(*coro);
-   }
-
-   inline const_iterator end() const {
-      return boost::end(*coro);
-   }
 
    inline iterator begin() {
       return boost::begin(*coro);
@@ -114,424 +120,54 @@ public:
    }
 
    inline bool empty() const {
-      return !(*coro);
-   }
-
-   template<class Predicate>
-   inline bool any(Predicate predicate) {
-      auto iter = std::find_if(begin(), end(), predicate);
-      return iter != end();
-   }
-
-   template<class Predicate>
-   inline bool all(Predicate predicate) {
-      auto iter = std::find_if(begin(), end(), [predicate](const T &t) { return !predicate(t); });
-      return iter == end();
-   }
-
-   inline T first() {
-      auto iter = begin();
-      if (iter == end()) {
-         throw std::range_error("First cannot be computed on empty sequence.");
-      }
-      return *iter;
-   }
-
-   inline T first_or_default(const T &default_value=T()) {
-      auto iter = begin();
-      if (iter == end()) {
-         return default_value;
-      }
-      return *iter;
-   }
-
-   inline T last() {
-      auto i = begin();
-      auto e = end();
-      if (i == e) {
-         throw std::range_error("Last cannot be computed on empty sequence.");
-      }
-
-      T result = *i;
-      for (++i; i != e; ++i) {
-         result = *i;
-      }
-      return result;
-   }
-
-   inline T last_or_default(T default_value=T()) {
-      for (auto i = begin(); i != end(); ++i) {
-         default_value = *i;
-      }
-      return default_value;
-   }
-
-   inline T element_at(std::size_t index) {
-      try {
-         return skip(index).first();
-      }
-      catch (const std::range_error &) {
-         throw std::range_error("Element at index cannot be retrieved because there aren't enough elements in the sequence.");
-      }
-   }
-
-   inline T element_at_or_default(std::size_t index, T default_value=T()) {
-      return skip(index).first_or_default(default_value);
-   }
-
-   inline T single() {
-      auto iter = begin();
-      if (iter == end()) {
-         throw std::range_error("Cannot retrieve single result from empty sequence.");
-      }
-      T result = *iter++;
-
-      if (iter != end()) {
-         throw std::range_error("More than one element present in sequence.");
-      }
-
-      return std::move(result);
-   }
-
-   inline T single_or_default(T default_value=T()) {
-      auto iter = begin();
-      if (iter == end()) {
-         return default_value;
-      }
-      T result = *iter++;
-
-      if (iter != end()) {
-         return default_value;
-      }
-
-      return std::move(result);
-   }
-
-   template<class Comp=std::less<T>, class Alloc=std::allocator<T>>
-   inline sequence<T> sort(std::size_t reserve=0, Comp comp=Comp(), Alloc alloc=Alloc()) {
-      auto co = coro;
-      return sequence<T>([co, reserve, comp, alloc](sink_type &put) {
-            std::vector<T, Alloc> v(alloc);
-            v.reserve(reserve);
-            v.insert(v.end(), boost::begin(*co), boost::end(*co));
-            std::sort(v.begin(), v.end(), comp);
-            std::for_each(v.begin(), v.end(), std::ref(put));
-         });
-   }
-
-   template<class Alloc=std::allocator<T>>
-   inline sequence<T> reverse(std::size_t reserve=0, Alloc alloc=Alloc());
-
-   inline bool contains(const T &value) {
-      return std::find(begin(), end(), value) != end();
-   }
-
-   inline std::size_t count() const {
-      return static_cast<std::size_t>(std::distance(begin(), end()));
-   }
-
-   template<class Predicate>
-   inline std::size_t count(Predicate predicate) {
-      return std::count_if(begin(), end(), std::move(predicate));
-   }
-
-   template<class U>
-   inline sequence<std::pair<T, U>> zip_with(const sequence<U> &other) {
-      auto t_coro = this->coro;
-      auto u_coro = other.coro;
-      return sequence<std::pair<T, U>>([t_coro, u_coro](typename sequence<std::pair<T, U>>::coro_t::caller_type &put) {
-            auto ti = boost::begin(*t_coro);
-            auto tend = boost::end(*t_coro);
-            auto ui = boost::begin(*u_coro);
-            auto uend = boost::end(*u_coro);
-
-            while (ti != tend && ui != uend) {
-               put({ *ti++, *ui++ });
-            }
-         });
-   }
-
-   inline sequence<std::pair<T, T>> pairwise(bool capture_remainder=false) {
-      auto co = this->coro;
-      return sequence<std::pair<T, T>>([co, capture_remainder](typename sequence<std::pair<T, T>>::coro_t::caller_type &put) {
-            auto i = boost::begin(*co);
-            auto e = boost::end(*co);
-
-            while (i != e) {
-               T first = *i++;
-               if (i != e) {
-                  put({ first, *i++ });
-               }
-               else if (capture_remainder) {
-                  put({ first, T() });
-               }
-            }
-         });
-   }
-
-   template<class Comp=std::less<T>>
-   inline T max(Comp comp=Comp()) {
-      auto iter = std::max_element(begin(), end(), comp);
-      if (iter == end()) {
-         throw std::range_error("Max cannot be computed on empty sequence.");
-      }
-      return *iter;
-   }
-
-   template<class Comp=std::less<T>>
-   inline T min(Comp comp=Comp()) {
-      auto iter = std::min_element(begin(), end(), comp);
-      if (iter == end()) {
-         throw std::range_error("Min cannot be computed on empty sequence.");
-      }
-      return *iter;
-   }
-
-#if 0
-   template<class Comp=std::less<T>>
-   inline std::pair<T, T> minmax(Comp comp=Comp()) {
-      auto p = std::minmax_element(begin(), end(), comp);
-      if (p.first == end()) {
-         throw std::range_error("Min-Max cannot be computed on empty sequence.");
-      }
-      return { *p.first, *p.second };
-   }
-#endif
-
-   template<class Add=std::plus<T>>
-   inline T sum(T initial=T(), Add add=Add()) {
-      return std::accumulate(begin(), end(), initial, add);
-   }
-
-   template<class U, class R=typename std::common_type<T, U>::type, class BinOp2=std::multiplies<typename std::common_type<T, U>::type>,
-            class BinOp1=std::plus<typename std::common_type<T, U>::type>>
-   inline R inner_product(const sequence<U> &rhs, R init=R(), BinOp1 binOp1=BinOp1(), BinOp2 binOp2=BinOp2()) {
-      return std::inner_product(begin(), end(), rhs.begin(), init, binOp1, binOp2);
-   }
-
-   template<class Transform>
-   inline sequence<decltype(std::declval<Transform>()(std::declval<T>()))> select(Transform transform) {
-      typedef typename std::result_of<Transform(T)>::type result_type;
-      typedef sequence<result_type> result_sequence;
-      auto co = coro;
-      return result_sequence([co, transform](typename result_sequence::sink_type &put) {
-            for (const T &t : *co) {
-               put(transform(t));
-            }
-         });
-   }
-
-   template<class Transform>
-   inline sequence<typename details_::select_many_helper<T, Transform>::element_type> select_many(Transform transform) {
-      typedef typename details_::select_many_helper<T, Transform>::sequence_type result_sequence;
-      auto co = coro;
-      return result_sequence([co, transform](typename result_sequence::coro_t::caller_type &put) {
-            for (const T &t : *co) {
-               for (const auto &s : transform(t)) {
-                  put(s);
-               }
-            }
-         });
-   }
-
-   template<class Predicate>
-   inline sequence<T> where(Predicate predicate) {
-      auto co = coro;
-      auto f = [co, predicate](sink_type &put) {
-            for (const T &t : *co) {
-               if (predicate(t)) {
-                  put(t);
-               }
-            }
-         };
-      return sequence<T>(std::move(f));
-   }
-
-   inline sequence<T> concat(const sequence<T> &other) {
-      auto l_co = coro;
-      auto r_co = other.coro;
-      return sequence<T>([l_co, r_co](sink_type &put) {
-            for (const T &t : *l_co) {
-               put(t);
-            }
-            for (const T &t : *r_co) {
-               put(t);
-            }
-         });
-   }
-
-   inline sequence<T> take(std::size_t n) {
-      auto co = coro;
-      return sequence<T>([co, n](sink_type &put) {
-            std::size_t i = 0;
-            auto iter = boost::begin(*co);
-            auto eiter = boost::end(*co);
-
-            while (i < n && iter != eiter) {
-               put(*iter);
-               ++iter; ++i;
-            }
-         });
-   }
-
-   template<class Predicate>
-   inline sequence<T> take_while(Predicate predicate) {
-      auto co = coro;
-      return sequence<T>([co, predicate](sink_type &put) {
-            auto i = boost::begin(*co);
-            auto iend = boost::end(*co);
-
-            while (i != iend && predicate(*i)) {
-               put(*i++);
-            }
-         });
-   }
-
-   inline sequence<T> skip(std::size_t n) {
-      auto co = coro;
-      return sequence<T>([co, n](sink_type &put) {
-            std::size_t i = 0;
-            auto iter = boost::begin(*co);
-            auto eiter = boost::end(*co);
-
-            while (i < n && iter != eiter) {
-               ++iter; ++i;
-            }
-
-            while (iter != eiter) {
-               put(*iter++);
-            }
-         });
-   }
-
-   template<class Predicate>
-   inline sequence<T> skip_while(Predicate predicate) {
-      auto co = coro;
-      return sequence<T>([co, predicate](sink_type &put) {
-            auto i = boost::begin(*co);
-            auto iend = boost::end(*co);
-
-            while (i != iend && predicate(*i)) {
-               ++i;
-            }
-
-            while (i != iend) {
-               put(*i++);
-            }
-         });
-   }
-
-   inline sequence<T> page(std::size_t page_number, std::size_t page_size) {
-      return skip(page_number * page_size)
-            .take(page_size);
-   }
-
-   template<class Comp=std::less<T>>
-   inline sequence<T> union_with(const sequence<T> &other, Comp comp=Comp());
-
-   template<class Comp=std::less<T>>
-   inline sequence<T> intersect_with(const sequence<T> &other, Comp comp=Comp());
-
-   template<class Comp=std::less<T>>
-   inline sequence<T> except(const sequence<T> &other, Comp comp=Comp());
-
-   template<class Comp=std::less<T>>
-   inline sequence<T> symmetric_difference(const sequence<T> &other, Comp comp=Comp());
-
-   template<class TSelector, class USelector, class Combiner, class U, class Alloc=std::allocator<U>>
-   inline sequence<typename details_::join_helper<T, TSelector, U, USelector, Combiner>::result_type> join(
-         sequence<U> u, TSelector select_t, USelector select_u, Combiner combine, std::size_t reserve=0,
-         Alloc alloc=Alloc()) {
-      typedef typename details_::join_helper<T, TSelector, U, USelector, Combiner>::result_type result_type;
-      typedef typename sequence<result_type>::sink_type result_sink_type;
-
-      auto t_co = coro;
-      auto u_co = u.coro;
-      return sequence<result_type>([t_co, u_co, select_t, select_u, combine, reserve, alloc](result_sink_type &put) {
-            std::vector<U, Alloc> uvec(std::move(alloc));
-            uvec.reserve(reserve);
-            uvec.insert(uvec.end(), boost::begin(*u_co), boost::end(*u_co));
-            for (auto titer = boost::begin(*t_co), tend = boost::end(*t_co); titer != tend; ++titer) {
-               for (auto uiter = uvec.begin(), uend = uvec.end(); uiter != uend; ++uiter) {
-                  if (select_t(*titer) == select_u(*uiter)) {
-                     put(combine(*titer, *uiter));
-                  }
-               }
-            }
-         });
-   }
-
-   template<class Container>
-   static inline sequence<T> from(Container & c) {
-      return from(std::begin(c), std::end(c));
-   }
-
-   static inline sequence<T> from(std::initializer_list<T> l) {
-      return sequence<T>([l](sink_type &put) {
-            std::for_each(l.begin(), l.end(), std::ref(put));
-         });
-   }
-
-   template<class InputIterator>
-   static inline sequence<T> from(InputIterator b, InputIterator e) {
-      return sequence<T>([b, e](sink_type &put) {
-            std::for_each(b, e, std::ref(put));
-         });
-   }
-
-   template<class Generator>
-   static inline sequence<T> generate(Generator generate, std::size_t n) {
-      return sequence<T>([generate, n](sink_type &put) {
-            for (std::size_t i = 0; i < n; ++i) {
-               put(generate());
-            }
-         });
-   }
-
-   static inline sequence<T> range(T start, T finish, T delta=1) {
-      check_delta(delta, std::is_signed<T>());
-
-      if (start < finish) {
-         return sequence<T>([start, finish, delta](sink_type &put) {
-               for (T i = start; i < finish; i+=delta) {
-                  put(i);
-               }
-            });
-      }
-      else if (finish < start) {
-         return sequence<T>([start, finish, delta](sink_type &put) {
-               for (T i = start; i > finish; i-=delta) {
-                  put(i);
-               }
-            });
-      }
-
-      return empty_sequence();
-   }
-
-   static inline sequence<T> empty_sequence() {
-      return sequence<T>([](sink_type &){});
+      return !(coro && *coro);
    }
 
 private:
-   static inline void check_delta(T delta, std::true_type) {
-      if (!(0 < delta)) {
-         throw std::domain_error("Delta must be positive.");
-      }
-   }
-
-   static inline void check_delta(T, std::false_type) noexcept {
-   }
-
    std::shared_ptr<coro_t> coro;
 };
 
 
-template<class T>
+template<class L, class R>
+inline bool operator==(const sequence<L> &l, const sequence<R> &r) {
+   auto li = l.begin();
+   auto le = l.end();
+   auto ri = r.begin();
+   auto re = r.end();
+
+   while (li != le && ri != re) {
+      if (*li++ != *ri++) {
+         return false;
+      }
+   }
+
+   return li == le && ri == re;
+}
+
+
+template<class L, class R>
+inline bool operator!=(const sequence<L> &l, const sequence<R> &r) {
+   return !(l == r);
+}
+
+
+template<class S, class Op>
+inline auto operator>>(sequence<S> &s, sequence_operation<Op> sop) {
+   return sop(std::move(s));
+}
+
+
+template<class S, class Op>
+inline auto operator>>(sequence<S> &&s, sequence_operation<Op> sop) {
+   return sop(std::move(s));
+}
+
+
+template<class Sink>
 class sequence_sink_iterator : public std::iterator<std::output_iterator_tag, void, void, void, void> {
 public:
-   typedef sequence<T> sequence_type;
-   typedef typename sequence_type::sink_type sink_type;
+   typedef Sink sink_type;
+
    class reference {
    public:
       explicit inline reference(sink_type &s) :
@@ -539,8 +175,9 @@ public:
       {
       }
 
-      inline reference &operator =(const T &t) {
-         sink(t);
+      template<class T>
+      inline reference &operator =(T &&t) {
+         sink(std::forward<T>(t));
          return *this;
       }
 
@@ -557,11 +194,11 @@ public:
       return reference(sink);
    }
 
-   inline sequence_sink_iterator<T> &operator++() {
+   inline sequence_sink_iterator<Sink> &operator++() {
       return *this;
    }
 
-   inline sequence_sink_iterator<T> &operator++(int) {
+   inline sequence_sink_iterator<Sink> &operator++(int) {
       return *this;
    }
 
@@ -570,72 +207,20 @@ private:
 };
 
 
-template<class T>
-template<class Comp>
-inline sequence<T> sequence<T>::union_with(const sequence<T> &other, Comp comp) {
-   auto l_co = coro;
-   auto r_co = other.coro;
-
-   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
-         std::set_union(boost::begin(*l_co), boost::end(*l_co),
-                        boost::begin(*r_co), boost::end(*r_co),
-                        sequence_sink_iterator<T>(sink));
-      });
+template<class Sink>
+inline sequence_sink_iterator<Sink> sink_iterator(Sink &sink) {
+   return sequence_sink_iterator<Sink>{sink};
 }
 
 
-template<class T>
-template<class Comp>
-inline sequence<T> sequence<T>::intersect_with(const sequence<T> &other, Comp comp) {
-   auto l_co = coro;
-   auto r_co = other.coro;
-
-   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
-         std::set_intersection(boost::begin(*l_co), boost::end(*l_co),
-                               boost::begin(*r_co), boost::end(*r_co),
-                               sequence_sink_iterator<T>(sink));
-      });
-}
-
-
-template<class T>
-template<class Comp>
-inline sequence<T> sequence<T>::except(const sequence<T> &other, Comp comp) {
-   auto l_co = coro;
-   auto r_co = other.coro;
-
-   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
-         std::set_difference(boost::begin(*l_co), boost::end(*l_co),
-                             boost::begin(*r_co), boost::end(*r_co),
-                             sequence_sink_iterator<T>(sink));
-      });
-}
-
-
-template<class T>
-template<class Comp>
-inline sequence<T> sequence<T>::symmetric_difference(const sequence<T> &other, Comp comp) {
-   auto l_co = coro;
-   auto r_co = other.coro;
-
-   return sequence<T>([l_co, r_co, comp](sink_type &sink) {
-         std::set_symmetric_difference(boost::begin(*l_co), boost::end(*l_co),
-                                       boost::begin(*r_co), boost::end(*r_co),
-                                       sequence_sink_iterator<T>(sink));
-      });
-}
-
-
-template<class T>
-template<class Alloc>
-inline sequence<T> sequence<T>::reverse(std::size_t reserve, Alloc alloc) {
-   auto co = coro;
-   return sequence<T>([co, reserve, alloc](sink_type &put) {
-         std::vector<T, Alloc> v(alloc);
-         v.reserve(reserve);
-         v.insert(v.end(), boost::begin(*co), boost::end(*co));
-         std::copy(v.rbegin(), v.rend(), sequence_sink_iterator<T>(put));
-      });
-}
+#include "details/aggregate.h"
+#include "details/container.h"
+#include "details/element_access.h"
+#include "details/logical.h"
+#include "details/ordering.h"
+#include "details/partitioning.h"
+#include "details/projection.h"
+#include "details/restriction.h"
+#include "details/set_operations.h"
 
 #endif
