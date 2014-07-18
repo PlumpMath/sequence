@@ -5,6 +5,8 @@
 
 namespace {
 
+using namespace std::experimental;
+
 
 struct A { std::string a; };
 
@@ -22,6 +24,26 @@ struct combine {
       return { l.a, l.b, r.c };
    }
 };
+
+
+inline std::ostream& operator<<(std::ostream &os, const A &a) {
+   return os << "A{'" << a.a << '}';
+}
+
+
+inline std::ostream& operator<<(std::ostream &os, const B &b) {
+   return os << "B{'" << b.a << "', " << b.b << '}';
+}
+
+
+inline std::ostream& operator<<(std::ostream &os, const C &c) {
+   return os << "C{'" << c.a << "', " << c.c << '}';
+}
+
+
+inline std::ostream& operator<<(std::ostream &os, const D &d) {
+   return os << "D{'" << d.a << "', " << d.b << ", " << d.c << '}';
+}
 
 
 TEST(any, finds_at_least_one_value_that_holds_true) {

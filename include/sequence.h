@@ -1,5 +1,5 @@
-#ifndef SEQUENCE_H__
-#define SEQUENCE_H__
+#ifndef _CXXSTD_EXPERIMENTAL_SEQUENCE_H__
+#define _CXXSTD_EXPERIMENTAL_SEQUENCE_H__
 
 #include <boost/coroutine/coroutine.hpp>
 #include <functional>
@@ -7,22 +7,18 @@
 #include <type_traits>
 
 
-namespace details_ {
-
-template<bool B, class T=void>
-using disable_if_t = std::enable_if_t<!B, T>;
-
-}
+namespace std {
+namespace experimental {
 
 
 template<class> class sequence;
 
 
 template<class T>
-class sequence_iterator : public std::iterator<std::input_iterator_tag, T> {
+class sequence_iterator : public iterator<input_iterator_tag, T> {
    friend class sequence<T>;
    typedef boost::coroutines::coroutine<T()> coro_t;
-   typedef decltype(boost::begin(std::declval<coro_t &>())) base_iterator;
+   typedef decltype(boost::begin(declval<coro_t &>())) base_iterator;
 
 public:
    inline T operator*() {
@@ -48,7 +44,7 @@ public:
 
 private:
    inline sequence_iterator(base_iterator i) :
-      iter(std::move(i))
+      iter(move(i))
    {
    }
 
@@ -63,7 +59,7 @@ class sequence_operation {
 
 public:
    explicit inline sequence_operation(Op &&op_) :
-      op(std::move(op_))
+      op(move(op_))
    {
    }
 
@@ -72,13 +68,13 @@ public:
 
    template<class S>
    inline auto operator()(sequence<S> &&s) {
-      return op(std::move(s));
+      return op(move(s));
    }
 };
 
 
 template<class F> inline sequence_operation<F> sequence_manipulator(F &&f) {
-   return sequence_operation<F>{std::move(f)};
+   return sequence_operation<F>{move(f)};
 }
 
 
@@ -90,12 +86,12 @@ class sequence {
 public:
    typedef T value_type;
    typedef sequence_iterator<T> iterator;
-   typedef std::size_t size_type;
+   typedef size_t size_type;
    typedef typename coro_t::caller_type sink_type;
 
    template<class Fun>
    explicit inline sequence(Fun &&f) :
-      coro(std::make_shared<coro_t>(std::move(f)))
+      coro(make_shared<coro_t>(move(f)))
    {
    }
 
@@ -124,7 +120,7 @@ public:
    }
 
 private:
-   std::shared_ptr<coro_t> coro;
+   shared_ptr<coro_t> coro;
 };
 
 
@@ -153,18 +149,18 @@ inline bool operator!=(const sequence<L> &l, const sequence<R> &r) {
 
 template<class S, class Op>
 inline auto operator>>(sequence<S> &s, sequence_operation<Op> sop) {
-   return sop(std::move(s));
+   return sop(move(s));
 }
 
 
 template<class S, class Op>
 inline auto operator>>(sequence<S> &&s, sequence_operation<Op> sop) {
-   return sop(std::move(s));
+   return sop(move(s));
 }
 
 
 template<class Sink>
-class sequence_sink_iterator : public std::iterator<std::output_iterator_tag, void, void, void, void> {
+class sequence_sink_iterator : public iterator<output_iterator_tag, void, void, void, void> {
 public:
    typedef Sink sink_type;
 
@@ -177,7 +173,7 @@ public:
 
       template<class T>
       inline reference &operator =(T &&t) {
-         sink(std::forward<T>(t));
+         sink(forward<T>(t));
          return *this;
       }
 
@@ -222,5 +218,8 @@ inline sequence_sink_iterator<Sink> sink_iterator(Sink &sink) {
 #include "details/projection.h"
 #include "details/restriction.h"
 #include "details/set_operations.h"
+
+}
+}
 
 #endif
