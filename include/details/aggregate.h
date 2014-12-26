@@ -1,33 +1,43 @@
-#ifndef SEQUENCE_AGGREGATE_H__
-#define SEQUENCE_AGGREGATE_H__
+#ifndef SEQUENCING_AGGREGATE_H__
+#define SEQUENCING_AGGREGATE_H__
 
-#ifndef _CXXSTD_EXPERIMENTAL_SEQUENCE_H__
+#ifndef SEQUENCING_SEQUENCE_H__
 #error This file is meant to be included from sequence.h
 #endif
 
 
 inline auto count() {
+   using std::begin;
+   using std::end;
+   using std::distance;
    return sequence_manipulator([](sequence<auto> s) mutable {
-         return static_cast<size_t>(distance(s.begin(), s.end()));
+         return static_cast<std::size_t>(distance(begin(s), end(s)));
       });
 }
 
 
 template<class Predicate>
 inline auto count(Predicate p) {
+   using std::begin;
+   using std::end;
+   using std::count_if;
    return sequence_manipulator([=](sequence<auto> s) mutable {
-         return count_if(s.begin(), s.end(), p);
+         return count_if(begin(s), end(s), p);
       });
 }
 
 
-template<class Comp=less<void>>
+template<class Comp=std::less<void>>
 inline auto max(Comp &&comp={}) {
+   using std::begin;
+   using std::end;
+   using std::max_element;
+
    return sequence_manipulator([comp](sequence<auto> s) mutable {
-         auto e = s.end();
-         auto i = max_element(s.begin(), e, comp);
+         auto e = end(s);
+         auto i = max_element(begin(s), e, comp);
          if (i == e) {
-            throw range_error("Max cannot be computed on empty sequence.");
+            throw std::range_error("Max cannot be computed on empty sequence.");
          }
 
          return *i;
@@ -35,13 +45,17 @@ inline auto max(Comp &&comp={}) {
 }
 
 
-template<class Comp=less<void>>
+template<class Comp=std::less<void>>
 inline auto min(Comp &&comp={}) {
+   using std::begin;
+   using std::end;
+   using std::min_element;
+
    return sequence_manipulator([comp](sequence<auto> s) mutable {
-         auto e = s.end();
-         auto i = min_element(s.begin(), e, comp);
+         auto e = end(s);
+         auto i = min_element(begin(s), e, comp);
          if (i == e) {
-            throw range_error("Min cannot be computed on empty sequence.");
+            throw std::range_error("Min cannot be computed on empty sequence.");
          }
 
          return *i;
@@ -49,15 +63,19 @@ inline auto min(Comp &&comp={}) {
 }
 
 
-template<class Comp=less<void>>
+template<class Comp=std::less<void>>
 inline auto minmax(Comp &&comp={}) {
+   using std::begin;
+   using std::end;
+   using std::make_pair;
+
    return sequence_manipulator([comp](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
-         auto i = s.begin();
-         auto e = s.end();
+         auto i = begin(s);
+         auto e = end(s);
          if (i == e) {
-            throw range_error("Min/Max cannot be computed on empty sequence.");
+            throw std::range_error("Min/Max cannot be computed on empty sequence.");
          }
 
          S min_result{*i};
@@ -76,23 +94,30 @@ inline auto minmax(Comp &&comp={}) {
 }
 
 
-template<class T, class Add=plus<void>>
+template<class T, class Add=std::plus<void>>
 inline auto sum(T init={}, Add &&add=Add{}) {
+   using std::begin;
+   using std::end;
+   using std::accumulate;
+
    return sequence_manipulator([=](sequence<auto> s) mutable {
-         return accumulate(s.begin(), s.end(), init, add);
+         return accumulate(begin(s), end(s), init, add);
       });
 }
 
 
-template<class Add=plus<void>, class Divide=divides<void>>
+template<class Add=std::plus<void>, class Divide=std::divides<void>>
 inline auto avg(Add &&add={}, Divide &&divide={}) {
+   using std::begin;
+   using std::end;
+
    return sequence_manipulator([=](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
-         auto i = s.begin();
-         auto e = s.end();
+         auto i = begin(s);
+         auto e = end(s);
          if (i == e) {
-            throw domain_error("Cannot compute average on empty sequence.");
+            throw std::domain_error("Cannot compute average on empty sequence.");
          }
 
          S den{1};
@@ -106,10 +131,15 @@ inline auto avg(Add &&add={}, Divide &&divide={}) {
 }
 
 
-template<class T, class R, class Add=plus<void>, class Multiply=multiplies<void>>
+template<class T, class R, class Add=std::plus<void>, class Multiply=std::multiplies<void>>
 inline auto inner_product(sequence<R> r, T init={}, Add &&add={}, Multiply &&multiply={}) {
+   using std::begin;
+   using std::end;
+   using std::inner_product;
+   using std::move;
+
    return sequence_manipulator([r=move(r), init, add, multiply](sequence<auto> l) mutable {
-         return inner_product(l.begin(), l.end(), r.begin(), init, add, multiply);
+         return inner_product(begin(l), end(l), begin(r), init, add, multiply);
       });
 }
 

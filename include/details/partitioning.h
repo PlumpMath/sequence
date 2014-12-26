@@ -1,12 +1,14 @@
 #ifndef SEQUENCE_PARTIONING_H__
 #define SEQUENCE_PARTIONING_H__
 
-#ifndef _CXXSTD_EXPERIMENTAL_SEQUENCE_H__
+#ifndef SEQUENCING_SEQUENCE_H__
 #error This file is meant to be included from sequence.h
 #endif
 
 
-inline auto take(size_t n) {
+inline auto take(std::size_t n) {
+   using std::move;
+
    return sequence_manipulator([n](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
@@ -24,6 +26,8 @@ inline auto take(size_t n) {
 
 template<class Predicate>
 inline auto take_while(Predicate predicate) {
+   using std::move;
+
    return sequence_manipulator([p=predicate](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
@@ -39,13 +43,17 @@ inline auto take_while(Predicate predicate) {
 }
 
 
-inline auto skip(size_t n) {
+inline auto skip(std::size_t n) {
+   using std::begin;
+   using std::end;
+   using std::move;
+
    return sequence_manipulator([n](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
          return sequence<S>{[s=move(s), n](auto &yield) mutable {
-               auto i = s.begin();
-               auto e = s.end();
+               auto i = begin(s);
+               auto e = end(s);
 
                for (; i != e && n > 0; ++i) {
                   --n;
@@ -61,12 +69,16 @@ inline auto skip(size_t n) {
 
 template<class Predicate>
 inline auto skip_while(Predicate predicate) {
+   using std::begin;
+   using std::end;
+   using std::move;
+
    return sequence_manipulator([p=predicate](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
          return sequence<S>{[s=move(s), p](auto &yield) mutable {
-               auto i = s.begin();
-               auto e = s.end();
+               auto i = begin(s);
+               auto e = end(s);
 
                for (; i != e; ++i) {
                   if (!p(*i)) {
@@ -82,7 +94,9 @@ inline auto skip_while(Predicate predicate) {
 }
 
 
-inline auto page(size_t page_index, size_t page_size) {
+inline auto page(std::size_t page_index, std::size_t page_size) {
+   using std::move;
+
    return sequence_manipulator([=](sequence<auto> s) mutable {
          // Effective result: return s >> skip(page_index * page_size) >> take(page_size);
          // This should be a little more efficient due to not having to create a
