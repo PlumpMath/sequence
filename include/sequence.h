@@ -88,6 +88,12 @@ public:
    typedef size_t size_type;
    typedef typename coro_t::caller_type sink_type;
 
+   template<class Fun, class Alloc>
+   explicit inline sequence(std::allocator_arg_t, const Alloc &alloc, Fun &&f) :
+      coro(std::allocate_shared<coro_t>(alloc, std::move(f)))
+   {
+   }
+
    template<class Fun>
    explicit inline sequence(Fun &&f) :
       coro(std::make_shared<coro_t>(std::move(f)))
@@ -226,6 +232,16 @@ inline sequence_sink_iterator<Sink> sink_iterator(Sink &sink) {
 #include "details/projection.h"
 #include "details/restriction.h"
 #include "details/set_operations.h"
+
+}
+
+
+namespace std {
+
+template<class, class> struct uses_allocator;
+
+template<class SequenceType, class Alloc>
+struct uses_allocator<sequencing::sequence<SequenceType>, Alloc> : std::true_type {};
 
 }
 

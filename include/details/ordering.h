@@ -7,7 +7,7 @@
 
 
 template<class Comp=std::less<void>, class Alloc=std::allocator<void>>
-inline auto sort(std::size_t reserve=0, Comp comp={}, Alloc alloc={}) {
+inline auto sort(std::size_t reserve=0, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::back_inserter;
@@ -27,7 +27,7 @@ inline auto sort(std::size_t reserve=0, Comp comp={}, Alloc alloc={}) {
          copy(begin(s), end(s), back_inserter(v));
          stable_sort(begin(v), end(v), comp);
 
-         return sequence_type{[v=move(v)](auto &yield) mutable {
+         return sequence_type{std::allocator_arg, alloc, [v=move(v)](auto &yield) mutable {
             for_each(begin(v), end(v), ref(yield));
          }};
       });
@@ -35,7 +35,7 @@ inline auto sort(std::size_t reserve=0, Comp comp={}, Alloc alloc={}) {
 
 
 template<class Alloc=std::allocator<void>>
-inline auto reverse(std::size_t reserve=0, Alloc alloc={}) {
+inline auto reverse(std::size_t reserve=0, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::back_inserter;
@@ -47,7 +47,7 @@ inline auto reverse(std::size_t reserve=0, Alloc alloc={}) {
    return sequence_manipulator([=](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
-         return sequence<S>{[=, s=move(s)](auto &yield) mutable {
+         return sequence<S>{std::allocator_arg, alloc, [=, s=move(s)](auto &yield) mutable {
                typedef typename Alloc::template rebind<S>::other v_alloc;
 
                std::vector<S, v_alloc> v{v_alloc{alloc}};

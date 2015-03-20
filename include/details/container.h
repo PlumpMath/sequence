@@ -41,16 +41,16 @@ inline auto contains(const T &t) {
 }
 
 
-template<class InputIterator>
-inline sequence<typename std::iterator_traits<InputIterator>::value_type> from(InputIterator b, InputIterator e) {
+template<class InputIterator, class Alloc=std::allocator<void>>
+inline sequence<typename std::iterator_traits<InputIterator>::value_type> from(InputIterator b, InputIterator e, const Alloc &alloc={}) {
    using std::for_each;
    using std::ref;
 
    typedef sequence<typename std::iterator_traits<InputIterator>::value_type> sequence_type;
 
-   return sequence_type([=](auto &yield) mutable {
+   return sequence_type{std::allocator_arg, alloc, [=](auto &yield) mutable {
          for_each(b, e, ref(yield));
-      });
+      }};
 }
 
 
@@ -59,22 +59,22 @@ inline sequence<typename Container::value_type> from(Container const &c) {
    using std::begin;
    using std::end;
 
-   return from(begin(c), end(c));
+   return from(begin(c), end(c), c.get_allocator());
 }
 
 
-template<class T>
-inline sequence<T> from(std::initializer_list<T> c) {
+template<class T, class Alloc=std::allocator<void>>
+inline sequence<T> from(std::initializer_list<T> c, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
 
-   return from(begin(c), end(c));
+   return from(begin(c), end(c), alloc);
 }
 
 
-template<class T>
-inline sequence<T> from(const T *c) {
-   return sequence<T>([c] (auto &yield) mutable {
+template<class T, class Alloc=std::allocator<void>>
+inline sequence<T> from(const T *c, const Alloc &alloc={}) {
+   return sequence<T>(std::allocator_arg, alloc, [c] (auto &yield) mutable {
          for (; *c; ++c) {
             yield(*c);
          }
@@ -82,11 +82,11 @@ inline sequence<T> from(const T *c) {
 }
 
 
-template<class Generator>
-static inline sequence<std::result_of_t<Generator()>> generate(Generator generate, std::size_t n) {
+template<class Generator, class Alloc=std::allocator<void>>
+static inline sequence<std::result_of_t<Generator()>> generate(Generator generate, std::size_t n, const Alloc &alloc={}) {
    typedef sequence<std::result_of_t<Generator()>> sequence_type;
 
-   return sequence_type([=](auto &yield) mutable {
+   return sequence_type(std::allocator_arg, alloc, [=](auto &yield) mutable {
          for (std::size_t i = 0; i < n; ++i) {
             yield(generate());
          }
@@ -94,19 +94,19 @@ static inline sequence<std::result_of_t<Generator()>> generate(Generator generat
 }
 
 
-template<class T>
-inline sequence<T> range(T start, T finish, T delta=1) {
+template<class T, class Alloc=std::allocator<void>>
+inline sequence<T> range(T start, T finish, T delta=1, const Alloc &alloc={}) {
    details_::check_delta(delta, std::is_signed<T>{});
 
    if (start < finish) {
-      return sequence<T>([=](auto &yield) mutable {
+      return sequence<T>(std::allocator_arg, alloc, [=](auto &yield) mutable {
             for (T i = start; i < finish; i += delta) {
                yield(i);
             }
          });
    }
    else if (finish < start) {
-      return sequence<T>([=](auto &yield) mutable {
+      return sequence<T>(std::allocator_arg, alloc, [=](auto &yield) mutable {
             for (T i = start; i > finish; i -= delta) {
                yield(i);
             }
@@ -117,15 +117,15 @@ inline sequence<T> range(T start, T finish, T delta=1) {
 }
 
 
-template<class R>
-inline auto zip_with(sequence<R> rhs) {
+template<class R, class Alloc=std::allocator<void>>
+inline auto zip_with(sequence<R> rhs, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
 
-   return sequence_manipulator([r_=move(rhs)](sequence<auto> l) mutable {
+   return sequence_manipulator([alloc, r_=move(rhs)](sequence<auto> l) mutable {
          typedef typename decltype(l)::value_type L;
-         return sequence<std::pair<L, R>>([l=move(l), r=move(r_)](auto &yield) mutable {
+         return sequence<std::pair<L, R>>(std::allocator_arg, alloc, [l=move(l), r=move(r_)](auto &yield) mutable {
                auto li = begin(l);
                auto le = end(l);
                auto ri = begin(r);
@@ -145,7 +145,8 @@ enum class pairwise_capture {
 };
 
 
-inline auto pairwise(pairwise_capture capture=pairwise_capture::ignore_remainder) {
+template<class Alloc=std::allocator<void>>
+inline auto pairwise(pairwise_capture capture=pairwise_capture::ignore_remainder, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::forward;
@@ -154,7 +155,7 @@ inline auto pairwise(pairwise_capture capture=pairwise_capture::ignore_remainder
    return sequence_manipulator([=](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
-         return sequence<std::pair<S, S>>{[s=move(s), capture=capture](auto &yield) mutable {
+         return sequence<std::pair<S, S>>{std::allocator_arg, alloc, [s=move(s), capture=capture](auto &yield) mutable {
                auto i = begin(s);
                auto e = end(s);
 
@@ -172,18 +173,18 @@ inline auto pairwise(pairwise_capture capture=pairwise_capture::ignore_remainder
 }
 
 
-template<class T>
-inline auto concat(sequence<T> rhs) {
+template<class T, class Alloc=std::allocator<void>>
+inline auto concat(sequence<T> rhs, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
 
-   return sequence_manipulator([r_=move(rhs)](sequence<T> l_) mutable {
+   return sequence_manipulator([alloc, r_=move(rhs)](sequence<T> l_) mutable {
          auto f = [r=move(r_), l=move(l_)](auto &yield) mutable {
                copy(begin(l), end(l), sink_iterator(yield));
                copy(begin(r), end(r), sink_iterator(yield));
             };
-         return sequence<T>{move(f)};
+         return sequence<T>{std::allocator_arg, alloc, move(f)};
       });
 }
 

@@ -32,32 +32,32 @@ public:
 }
 
 
-template<class Transform>
-inline auto select(Transform f) {
+template<class Transform, class Alloc=std::allocator<void>>
+inline auto select(Transform f, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::transform;
 
-   return sequence_manipulator([f=move(f)](sequence<auto> s) mutable {
+   return sequence_manipulator([alloc, f=move(f)](sequence<auto> s) mutable {
          typedef std::result_of_t<Transform(typename decltype(s)::value_type)> output_value;
 
-         return sequence<output_value>{[f=move(f), s=move(s)](auto &yield) mutable {
+         return sequence<output_value>{std::allocator_arg, alloc, [f=move(f), s=move(s)](auto &yield) mutable {
                transform(begin(s), end(s), sink_iterator(yield), move(f));
             }};
       });
 }
 
 
-template<class Transform>
-inline auto select_many(Transform transform) {
+template<class Transform, class Alloc=std::allocator<void>>
+inline auto select_many(Transform transform, const Alloc &alloc={}) {
    using std::move;
 
-   return sequence_manipulator([t=move(transform)](sequence<auto> s) mutable {
+   return sequence_manipulator([alloc, t=move(transform)](sequence<auto> s) mutable {
          typedef typename details_::select_many_helper<typename decltype(s)::value_type,
                                                        Transform>::sequence_type sequence_type;
 
-         return sequence_type{[s=move(s), transform=move(t)](auto &yield) mutable {
+         return sequence_type{std::allocator_arg, alloc, [s=move(s), transform=move(t)](auto &yield) mutable {
                for (const auto &s_value : s) {
                   for (auto out_value : transform(s_value)) {
                      yield(out_value);
@@ -69,7 +69,7 @@ inline auto select_many(Transform transform) {
 
 
 template<class LSelector, class RSelector, class Combiner, class R, class Alloc=std::allocator<R>, class Comp=std::equal_to<void>>
-inline auto join(sequence<R> r_, LSelector select_l, RSelector select_r, Combiner combine, std::size_t reserve, Alloc alloc={}, Comp comp={}) {
+inline auto join(sequence<R> r_, LSelector select_l, RSelector select_r, Combiner combine, std::size_t reserve, const Alloc &alloc={}, Comp comp={}) {
    using std::begin;
    using std::end;
    using std::copy;
@@ -92,7 +92,7 @@ inline auto join(sequence<R> r_, LSelector select_l, RSelector select_r, Combine
                }
             }
          };
-         return sequence<result_type>{move(f)};
+         return sequence<result_type>{std::allocator_arg, alloc, move(f)};
       });
 }
 

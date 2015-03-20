@@ -6,13 +6,14 @@
 #endif
 
 
-inline auto take(std::size_t n) {
+template<class Alloc=std::allocator<void>>
+inline auto take(std::size_t n, const Alloc &alloc={}) {
    using std::move;
 
-   return sequence_manipulator([n](sequence<auto> s) mutable {
+   return sequence_manipulator([=](sequence<auto> s) mutable {
          typedef typename decltype(s)::value_type S;
 
-         return sequence<S>{[s=move(s), n](auto &yield) mutable {
+         return sequence<S>{std::allocator_arg, alloc, [s=move(s), n](auto &yield) mutable {
                for (const S &element : s) {
                   if (n-- == 0) {
                      break;

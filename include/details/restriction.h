@@ -6,12 +6,12 @@
 #endif
 
 
-template<class Predicate>
-inline auto where(Predicate p) {
+template<class Predicate, class Alloc=std::allocator<void>>
+inline auto where(Predicate p, const Alloc &alloc={}) {
    using std::move;
 
    return sequence_manipulator([=](sequence<auto> s) mutable {
-         return decltype(s){[p, s=move(s)](auto &yield) mutable {
+         return decltype(s){std::allocator_arg, alloc, [p, s=move(s)](auto &yield) mutable {
                for (const auto &element : s) {
                   if (p(element)) {
                      yield(element);

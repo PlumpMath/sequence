@@ -6,66 +6,66 @@
 #endif
 
 
-template<class T, class Comp=std::less<void>>
-inline auto union_with(sequence<T> r, Comp comp={}) {
+template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
+inline auto union_with(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_union;
 
-   return sequence_manipulator([rhs=move(r), comp](sequence<T> lhs) mutable {
+   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
          auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
                set_union(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
             };
-         return sequence<T>{move(f)};
+         return sequence<T>{std::allocator_arg, alloc, move(f)};
       });
 }
 
 
-template<class T, class Comp=std::less<void>>
-inline auto intersect_with(sequence<T> r, Comp comp={}) {
+template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
+inline auto intersect_with(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_intersection;
 
-   return sequence_manipulator([rhs=move(r), comp](sequence<T> lhs) mutable {
+   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
          auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
                set_intersection(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
             };
-         return sequence<T>{move(f)};
+         return sequence<T>{std::allocator_arg, alloc, move(f)};
       });
 }
 
 
-template<class T, class Comp=std::less<void>>
-inline auto except(sequence<T> r, Comp comp={}) {
+template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
+inline auto except(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_difference;
 
-   return sequence_manipulator([rhs=move(r), comp](sequence<T> lhs) mutable {
+   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
          auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
                set_difference(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
             };
-         return sequence<T>{move(f)};
+         return sequence<T>{std::allocator_arg, alloc, move(f)};
       });
 }
 
 
-template<class T, class Comp=std::less<void>>
-inline auto symmetric_difference(sequence<T> r, Comp comp={}) {
+template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
+inline auto symmetric_difference(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_symmetric_difference;
 
-   return sequence_manipulator([rhs=move(r), comp](sequence<T> lhs) mutable {
+   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
          auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
                set_symmetric_difference(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
             };
-         return sequence<T>{move(f)};
+         return sequence<T>{std::allocator_arg, alloc, move(f)};
       });
 }
 
