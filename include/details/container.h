@@ -48,7 +48,7 @@ inline sequence<typename std::iterator_traits<InputIterator>::value_type> from(I
 
    typedef sequence<typename std::iterator_traits<InputIterator>::value_type> sequence_type;
 
-   return sequence_type{std::allocator_arg, alloc, [=](auto &yield) mutable {
+   return sequence_type{std::allocator_arg, alloc, [=, i=b](auto &yield) mutable {
          for_each(b, e, ref(yield));
       }};
 }
@@ -56,6 +56,15 @@ inline sequence<typename std::iterator_traits<InputIterator>::value_type> from(I
 
 template<class Container>
 inline sequence<typename Container::value_type> from(Container const &c) {
+   using std::begin;
+   using std::end;
+
+   return from(begin(c), end(c), c.get_allocator());
+}
+
+
+template<class Container>
+inline sequence<typename Container::value_type> from(Container &&c) {
    using std::begin;
    using std::end;
 
@@ -132,7 +141,9 @@ inline auto zip_with(sequence<R> rhs, const Alloc &alloc={}) {
                auto re = end(r);
 
                while (li != le && ri != re) {
-                  yield({ *li++, *ri++ });
+                  yield({ *li, *ri });
+                  ++li;
+                  ++ri;
                }
             });
       });
@@ -160,9 +171,11 @@ inline auto pairwise(pairwise_capture capture=pairwise_capture::ignore_remainder
                auto e = end(s);
 
                while (i != e) {
-                  S first{ *i++ };
+                  S first{ *i };
+                  ++i;
                   if (i != e) {
-                     yield({ forward<S>(first), *i++ });
+                     yield({ forward<S>(first), *i });
+                     ++i;
                   }
                   else if (capture == pairwise_capture::use_remainder) {
                      yield({ forward<S>(first), S{} });

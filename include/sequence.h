@@ -12,10 +12,11 @@ namespace sequencing {
 template<class> class sequence;
 
 
+#if 0
 template<class T>
 class sequence_iterator : public std::iterator<std::input_iterator_tag, T> {
    friend class sequence<T>;
-   typedef boost::coroutines::coroutine<T()> coro_t;
+   typedef typename boost::coroutines::asymmetric_coroutine<T>::push_type coro_t;
    typedef decltype(boost::begin(std::declval<coro_t &>())) base_iterator;
 
 public:
@@ -48,6 +49,10 @@ private:
 
    base_iterator iter;
 };
+#else
+template<class T>
+using sequence_iterator = typename boost::range_iterator<typename boost::coroutines::asymmetric_coroutine<T>::pull_type>::type;
+#endif
 
 
 template<class Op>
@@ -77,31 +82,63 @@ inline sequence_operation<F> sequence_manipulator(F &&f) {
 }
 
 
+namespace details_ {
+
+template<class T>
+class has_caller_type {
+   typedef char yes;
+   typedef char no[2];
+
+   template<class U>
+   static yes & test(T *, typename U::caller_type *dummy=nullptr);
+   template<class U>
+   static no  & test(...);
+
+public:
+   static constexpr bool value = sizeof(test<T>(nullptr)) == sizeof(yes);
+};
+
+
+template<bool, class> struct sink_type_helper;
+
+template<class T>
+struct sink_type_helper<true, T> {
+   typedef typename T::caller_type type;
+};
+
+template<class T>
+struct sink_type_helper<false, T> {
+   typedef typename T::pull_type type;
+};
+
+}
+
+
 template<class T>
 class sequence {
    template<class U> friend class sequence;
-   typedef boost::coroutines::coroutine<T()> coro_t;
+   typedef typename boost::coroutines::asymmetric_coroutine<T>::pull_type coro_t;
 
 public:
    typedef T value_type;
    typedef sequence_iterator<T> iterator;
    typedef size_t size_type;
-   typedef typename coro_t::caller_type sink_type;
+   typedef typename boost::coroutines::asymmetric_coroutine<T>::push_type sink_type;
 
    template<class Fun, class Alloc>
    explicit inline sequence(std::allocator_arg_t, const Alloc &alloc, Fun &&f) :
-      coro(std::allocate_shared<coro_t>(alloc, std::move(f)))
+      coro{std::allocate_shared<coro_t>(alloc, std::move(f))}
    {
    }
 
    template<class Fun>
    explicit inline sequence(Fun &&f) :
-      coro(std::make_shared<coro_t>(std::move(f)))
+      sequence{std::allocator_arg, std::allocator<void>{}, std::move(f)}
    {
    }
 
    sequence() :
-      sequence([](sink_type &) {})
+      sequence{[](sink_type &) {}}
    {
    }
 
@@ -179,7 +216,7 @@ public:
    class reference {
    public:
       explicit inline reference(sink_type &s) :
-         sink(s)
+         sink{s}
       {
       }
 

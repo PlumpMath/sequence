@@ -1,6 +1,6 @@
+#include <iostream>
 #include "../include/sequence.h"
 #include <gtest/gtest.h>
-#include <iostream>
 
 
 namespace {
@@ -9,7 +9,6 @@ using namespace sequencing;
 
 
 struct A { std::string a; };
-
 struct B { std::string a; int b; };
 struct C { std::string a; int c; };
 struct D { std::string a; int b; int c; };
@@ -651,16 +650,13 @@ TEST(pairwise, captures_remainder_when_specified_to_do_so) {
 
 TEST(max, provides_the_maximum_value) {
    // Given
-   const int start = 0;
-   const int finish = 10;
-   RecordProperty("start", start);
-   RecordProperty("finish", finish);
+   int expected = 8;
 
    // When
-   int actual = range(start, finish) | max();
+   int actual = from({6, expected, 2}) | max();
 
    // Then
-   ASSERT_EQ(finish - 1, actual);
+   ASSERT_EQ(expected, actual);
 }
 
 
@@ -675,16 +671,13 @@ TEST(max, throws_domain_error_on_empty_sequence) {
 
 TEST(min, provides_the_minimum_value) {
    // Given
-   const int start = 0;
-   const int finish = 10;
-   RecordProperty("start", start);
-   RecordProperty("finish", finish);
+   int expected = 8;
 
    // When
-   int actual = range(start, finish) | min();
+   int actual = from({55, 22, 13, expected, 92}) | min();
 
    // Then
-   ASSERT_EQ(start, actual);
+   ASSERT_EQ(expected, actual);
 }
 
 
@@ -996,7 +989,7 @@ TEST(union_with, properly_performs_union) {
    auto expected = range(0, 15);
 
    // When
-   auto actual = l | union_with(std::move(r));
+   auto actual = union_with(std::move(l), std::move(r));
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
@@ -1010,7 +1003,7 @@ TEST(intersect_with, properly_performs_intersection) {
    auto expected = { 7, 8, 9 };
 
    // When
-   auto actual = l | intersect_with(std::move(r));
+   auto actual = intersect_with(std::move(l), std::move(r));
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
@@ -1024,7 +1017,7 @@ TEST(except, properly_performs_set_difference) {
    auto expected = { 0, 2, 4, 6, 8, 10, 12, 14 };
 
    // When
-   auto actual = l | except(std::move(r));
+   auto actual = except(std::move(l), std::move(r));
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
@@ -1038,7 +1031,7 @@ TEST(symmetric_difference, properly_performs_set_difference) {
    auto expected = { 0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14 };
 
    // When
-   auto actual = l | symmetric_difference(std::move(r));
+   auto actual = symmetric_difference(std::move(l), std::move(r));
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));
@@ -1047,15 +1040,14 @@ TEST(symmetric_difference, properly_performs_set_difference) {
 
 TEST(join, produces_inner_join_of_two_sequences) {
    // Given
-   auto b = from({ B{ "foo", 3 }, B{ "bar", 5 } });
-   auto c = from({ C{ "foo", 7 }, C{ "foo", 25 } });
-   std::vector<D> expected = { { "foo", 3, 7 }, { "foo", 3, 25 } };
+   auto b = {B{"foo", 3}, B{"bar", 5}};
+   auto c = {C{"foo", 7}, C{"foo", 25}, C{"baz", 33}};
+   std::vector<D> expected = { {"foo", 3, 7}, {"foo", 3, 25} };
 
    // When
-   sequence<D> actual = b | join(std::move(c),
-                                 [](const B &b) { return b.a; },
-                                 [](const C &c) { return c.a; },
-                                 combine(), 4);
+   sequence<D> actual = join(from(b), [](const B &b) { return b.a; },
+                             from(c), [](const C &c) { return c.a; },
+                             combine(), 3);
 
    // Then
    ASSERT_TRUE(std::equal(expected.begin(), expected.end(), actual.begin()));

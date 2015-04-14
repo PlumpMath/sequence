@@ -68,31 +68,28 @@ inline auto select_many(Transform transform, const Alloc &alloc={}) {
 }
 
 
-template<class LSelector, class RSelector, class Combiner, class R, class Alloc=std::allocator<R>, class Comp=std::equal_to<void>>
-inline auto join(sequence<R> r_, LSelector select_l, RSelector select_r, Combiner combine, std::size_t reserve, const Alloc &alloc={}, Comp comp={}) {
+template<class LSelector, class RSelector, class Combiner, class R, class L, class Alloc=std::allocator<R>, class Comp=std::equal_to<void>>
+inline auto join(sequence<L> l, LSelector select_l, sequence<R> r, RSelector select_r, Combiner combine, std::size_t reserve, const Alloc &alloc={}, Comp comp={}) {
+   typedef sequence<typename details_::join_helper<L, LSelector, R, RSelector, Combiner>::result_type> result_type;
+
+   using std::back_inserter;
    using std::begin;
    using std::end;
    using std::copy;
    using std::move;
 
-   return sequence_manipulator([r=move(r_), select_l, select_r, combine, comp, reserve, alloc](sequence<auto> lhs) mutable {
-         typedef typename std::remove_reference_t<decltype(lhs)>::value_type L;
-         typedef typename details_::join_helper<L, LSelector, R, RSelector, Combiner>::result_type result_type;
+   std::vector<R, Alloc> rhs{alloc};
+   rhs.reserve(reserve);
+   copy(begin(r), end(r), back_inserter(rhs));
 
-         std::vector<R, Alloc> rvec(move(alloc));
-         rvec.reserve(reserve);
-         copy(begin(r), end(r), back_inserter(rvec));
-
-         auto f = [rvec=move(rvec), l=move(lhs), select_l, select_r, combine, comp](auto &yield) mutable {
-            for (const auto &l_element : l) {
-               for (const auto &r_element : rvec) {
-                  if (comp(select_l(l_element), select_r(r_element))) {
-                     yield(combine(l_element, r_element));
-                  }
+   return result_type(std::allocator_arg, alloc, [lhs=move(l), select_l, rhs=move(rhs), select_r, combine, comp](auto &yield) mutable {
+         for (const L &l : move(lhs)) {
+            for (const R &r : move(rhs)) {
+               if (comp(select_l(l), select_r(r))) {
+                  yield(combine(l, r));
                }
             }
-         };
-         return sequence<result_type>{std::allocator_arg, alloc, move(f)};
+         }
       });
 }
 

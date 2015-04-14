@@ -177,7 +177,8 @@ inline auto single_or_default() {
             return S{};
          }
          
-         S candidate{*i++};
+         S candidate{*i};
+         ++i;
          return (i == e) ? candidate : S{};
       });
 }
@@ -198,7 +199,8 @@ inline auto single_or_default(T &&t) {
             return S{t};
          }
          
-         S candidate{*i++};
+         S candidate{*i};
+         ++i;
          return (i == e) ? candidate : S{t};
       });
 }
@@ -218,7 +220,8 @@ inline auto single() {
             throw std::range_error("Cannot retrieve single result from empty sequence.");
          }
          
-         S candidate{*i++};
+         S candidate{*i};
+         ++i;
          if (i != e) {
             throw std::range_error("More than one element present in sequence.");
          }

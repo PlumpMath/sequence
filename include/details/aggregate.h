@@ -31,16 +31,24 @@ template<class Comp=std::less<void>>
 inline auto max(Comp &&comp={}) {
    using std::begin;
    using std::end;
-   using std::max_element;
 
    return sequence_manipulator([comp](sequence<auto> s) mutable {
+         typedef typename decltype(s)::value_type S;
+
+         auto i = begin(s);
          auto e = end(s);
-         auto i = max_element(begin(s), e, comp);
          if (i == e) {
-            throw std::range_error("Max cannot be computed on empty sequence.");
+            throw std::range_error("Min/Max cannot be computed on empty sequence.");
          }
 
-         return *i;
+         S result{*i};
+         for (++i; i != e; ++i) {
+            if (comp(result, *i)) {
+               result = *i;
+            }
+         }
+
+         return result;
       });
 }
 
@@ -49,16 +57,24 @@ template<class Comp=std::less<void>>
 inline auto min(Comp &&comp={}) {
    using std::begin;
    using std::end;
-   using std::min_element;
 
    return sequence_manipulator([comp](sequence<auto> s) mutable {
+         typedef typename decltype(s)::value_type S;
+
+         auto i = begin(s);
          auto e = end(s);
-         auto i = min_element(begin(s), e, comp);
          if (i == e) {
-            throw std::range_error("Min cannot be computed on empty sequence.");
+            throw std::range_error("Min/Max cannot be computed on empty sequence.");
          }
 
-         return *i;
+         S result{*i};
+         for (++i; i != e; ++i) {
+            if (comp(*i, result)) {
+               result = *i;
+            }
+         }
+
+         return result;
       });
 }
 

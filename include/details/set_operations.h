@@ -7,66 +7,54 @@
 
 
 template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
-inline auto union_with(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
+inline auto union_with(sequence<T> l, sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_union;
 
-   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
-         auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
-               set_union(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
-            };
-         return sequence<T>{std::allocator_arg, alloc, move(f)};
-      });
+   return sequence<T>{std::allocator_arg, alloc, [l=move(l), r=move(r), comp](auto &yield) mutable {
+         set_union(begin(l), end(l), begin(r), end(r), sink_iterator(yield), comp);
+      }};
 }
 
 
 template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
-inline auto intersect_with(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
+inline auto intersect_with(sequence<T> l, sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_intersection;
 
-   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
-         auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
-               set_intersection(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
-            };
-         return sequence<T>{std::allocator_arg, alloc, move(f)};
-      });
+   return sequence<T>{std::allocator_arg, alloc, [l=move(l), r=move(r), comp](auto &yield) mutable {
+         set_intersection(begin(l), end(l), begin(r), end(r), sink_iterator(yield), comp);
+      }};
 }
 
 
 template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
-inline auto except(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
+inline auto except(sequence<T> l, sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_difference;
 
-   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
-         auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
-               set_difference(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
-            };
-         return sequence<T>{std::allocator_arg, alloc, move(f)};
-      });
+   return sequence<T>{std::allocator_arg, alloc, [l=move(l), r=move(r), comp](auto &yield) mutable {
+         set_difference(begin(l), end(l), begin(r), end(r), sink_iterator(yield), comp);
+      }};
 }
 
 
 template<class T, class Comp=std::less<void>, class Alloc=std::allocator<void>>
-inline auto symmetric_difference(sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
+inline auto symmetric_difference(sequence<T> l, sequence<T> r, Comp comp={}, const Alloc &alloc={}) {
    using std::begin;
    using std::end;
    using std::move;
    using std::set_symmetric_difference;
 
-   return sequence_manipulator([rhs=move(r), comp, alloc](sequence<T> lhs) mutable {
-         auto f = [l_=move(lhs), r_=move(rhs), comp](auto &yield) mutable {
-               set_symmetric_difference(begin(l_), end(l_), begin(r_), end(r_), sink_iterator(yield), comp);
-            };
-         return sequence<T>{std::allocator_arg, alloc, move(f)};
-      });
+   return sequence<T>{std::allocator_arg, alloc, [l=move(l), r=move(r), comp](auto &yield) mutable {
+         set_symmetric_difference(begin(l), end(l), begin(r), end(r), sink_iterator(yield), comp);
+      }};
 }
 
 #endif
