@@ -1,7 +1,10 @@
 #ifndef SEQUENCING_SEQUENCE_H__
 #define SEQUENCING_SEQUENCE_H__
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wextra"
 #include <boost/coroutine/coroutine.hpp>
+#pragma GCC diagnostic pop
 #include <functional>
 #include <iterator>
 #include <type_traits>

@@ -106,6 +106,7 @@ inline auto page(std::size_t page_index, std::size_t page_size) {
 
          return sequence<S>{[s=move(s), skip_n=page_index * page_size, take_n=page_size](auto &yield) mutable {
                for (const S &element : s) {
+                  (void)element;
                   if (skip_n-- == 0) {
                      break;
                   }

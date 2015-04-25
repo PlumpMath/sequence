@@ -1,4 +1,5 @@
 #include <iostream>
+#include <random>
 #include "../include/sequence.h"
 #include <gtest/gtest.h>
 
@@ -6,6 +7,25 @@
 namespace {
 
 using namespace sequencing;
+
+std::mt19937 twister;
+auto random_int = [] (auto a, auto b) {
+   std::uniform_int_distribution<std::common_type_t<decltype(a), decltype(b)>> generate{a, b};
+   return generate(twister);
+};
+
+void seed_rng() {
+   int seed = ::testing::GTEST_FLAG(random_seed);
+   if (seed == 0) {
+      std::random_device generate_seed;
+      // This is the acceptable range from Google.
+      while (!((0 < seed) && (seed < 100000))) {
+         seed = generate_seed();
+      }
+   }
+   std::cout << "To reproduce results, specify '--gtest_random_seed=" << seed << "' on the command line." << std::endl;
+   twister.seed(seed);
+}
 
 
 struct A { std::string a; };
@@ -179,7 +199,7 @@ TEST(none, is_true_on_empty_sequence) {
 
 TEST(first, provides_first_value_in_the_sequence) {
    // Given
-   int expected = std::rand() % 5;
+   int expected = random_int(0, 4);
    RecordProperty("expected", expected);
    auto target = range(expected, 10);
 
@@ -202,7 +222,7 @@ TEST(first, throws_when_the_sequence_is_empty) {
 
 TEST(first_or_default, returns_first_value_in_the_sequence_when_the_sequence_is_not_empty) {
    // Given
-   int expected = std::rand() % 3;
+   int expected = random_int(0, 2);
    RecordProperty("expected", expected);
    auto target = range(expected, 10);
 
@@ -229,7 +249,7 @@ TEST(first_or_default, returns_default_constructed_value_when_the_sequence_is_em
 
 TEST(first_or_default, returns_provided_default_value_when_the_sequence_is_empty) {
    // Given
-   int expected = std::rand() % 87;
+   int expected = random_int(0, 86);
    RecordProperty("expected", expected);
    auto target = sequence<int>();
 
@@ -243,7 +263,7 @@ TEST(first_or_default, returns_provided_default_value_when_the_sequence_is_empty
 
 TEST(last, provides_last_value_in_the_sequence) {
    // Given
-   int expected = (std::rand() % 7) + 1;
+   int expected = random_int(1, 7);
    RecordProperty("expected", expected);
    auto target = range(0, expected + 1);
 
@@ -266,7 +286,7 @@ TEST(last, throws_when_the_sequence_is_empty) {
 
 TEST(last_or_default, returns_last_value_in_the_sequence_when_the_sequence_is_not_empty) {
    // Given
-   int expected = (std::rand() % 7) + 3;
+   int expected = random_int(3, 9);
    RecordProperty("expected", expected);
    auto target = range(2, expected + 1);
 
@@ -293,7 +313,7 @@ TEST(last_or_default, returns_default_constructed_value_when_the_sequence_is_emp
 
 TEST(last_or_default, returns_provided_default_value_when_the_sequence_is_empty) {
    // Given
-   int expected = (std::rand() % 37) + 3;
+   int expected = random_int(3, 39);
    RecordProperty("expected", expected);
    auto target = sequence<int>();
 
@@ -530,17 +550,19 @@ TEST(contains, returns_true_when_sequence_has_item) {
 TEST(count, is_0_when_sequence_is_empty) {
    // Given
    auto target = sequence<std::string>();
+   size_t expected = 0;
 
    // When
-   std::size_t actual = std::move(target) | count();
+   size_t actual = std::move(target) | count();
 
    // Then
-   ASSERT_EQ(0, actual);
+   ASSERT_EQ(expected, actual);
 }
 
 
 TEST(count, reflects_number_of_elements_in_sequence) {
    // Given
+   size_t expected = 3;
    std::vector<std::string> vec = { "hello", " ", "world" };
    auto target = from(vec);
 
@@ -548,12 +570,13 @@ TEST(count, reflects_number_of_elements_in_sequence) {
    std::size_t actual = target | count();
 
    // Then
-   ASSERT_EQ(3, actual);
+   ASSERT_EQ(expected, actual);
 }
 
 
 TEST(count, only_counts_the_elements_matching_the_predicate) {
    // Given
+   size_t expected = 2;
    std::vector<std::string> vec = { "hello", " ", "world", "foo", "bar" };
    auto target = from(vec);
 
@@ -561,12 +584,13 @@ TEST(count, only_counts_the_elements_matching_the_predicate) {
    std::size_t actual = target | count([](const std::string &s) { return s.size() == 3; });
 
    // Then
-   ASSERT_EQ(2, actual);
+   ASSERT_EQ(expected, actual);
 }
 
 
 TEST(zip_with, produces_a_sequence_with_same_number_of_elements_as_pairs) {
    // Given
+   size_t expected = 3;
    std::vector<std::string> svec = { "hello", " ", "world" };
    std::vector<int> ivec = { 1, 2, 3 };
    auto sseq = from(svec);
@@ -576,7 +600,7 @@ TEST(zip_with, produces_a_sequence_with_same_number_of_elements_as_pairs) {
    auto target = iseq | zip_with(std::move(sseq));
 
    // Then
-   ASSERT_EQ(3, target | count());
+   ASSERT_EQ(expected, target | count());
 }
 
 
@@ -598,13 +622,14 @@ TEST(zip_with, produces_a_sequence_with_same_elements_as_pairs) {
 
 TEST(pairwise, reduces_sequence_by_half) {
    // Given
+   size_t expected = 2;
    auto s = range(-1.0, 1.0, 0.5);
 
    // When
    auto target = s | pairwise();
 
    // Then
-   ASSERT_EQ(2, target | count());
+   ASSERT_EQ(expected, target | count());
 }
 
 
@@ -857,16 +882,16 @@ TEST(take, returns_first_n_elements) {
   ASSERT_TRUE(std::equal(ivec.begin(), ivec.end(), actual.begin()));
 }
 
-
 TEST(take, returns_all_elements_when_n_is_greater_than_number_of_elements) {
   // Given
+  size_t expected = 6;
   auto target = from({1, 2, 3, 4, 5, 6}) | take(20);
 
   // When
   std::size_t actual = target | count();
 
   // Then
-  ASSERT_EQ(6, actual);
+  ASSERT_EQ(expected, actual);
 }
 
 
@@ -936,25 +961,27 @@ TEST(skip_while, skips_until_predicate_fails) {
 
 TEST(page, returns_page_size_when_enough_elements_are_available) {
   // Given
+  size_t expected = 2;
   auto target = from({1.0, 2.0, 3.0, 4.0, 5.0, 6.0}) | page(0, 2);
 
   // When
   std::size_t actual = target | count();
 
   // Then
-  ASSERT_EQ(2, actual);
+  ASSERT_EQ(expected, actual);
 }
 
 
 TEST(page, returns_page_number_when_enough_elements_are_available) {
   // Given
+  int expected = 3;
   auto target = from({1, 2, 3, 4, 5, 6}) | page(1, 2);
 
   // When
   int actual = target | first();
 
   // Then
-  ASSERT_EQ(3, actual);
+  ASSERT_EQ(expected, actual);
 }
 
 
@@ -972,13 +999,14 @@ TEST(page, returns_empty_sequence_when_page_number_is_too_large) {
 
 TEST(page, returns_remaining_elements_on_last_page_with_smaller_than_page_size) {
   // Given
+  size_t expected = 2;
   auto target = from({1, 2, 3, 4, 5, 6}) | page(1, 4);
 
   // When
-  std::size_t actual = target | count();
+  size_t actual = target | count();
 
   // Then
-  ASSERT_EQ(2, actual);
+  ASSERT_EQ(expected, actual);
 }
 
 
@@ -1092,9 +1120,9 @@ TEST(from, produces_identical_sequence_as_initializer_list) {
 
 TEST(generate, produces_a_sequence_with_n_elements) {
    // Given
-   int x = std::rand() % 53;
-   const int start = x;
-   std::size_t n = (std::rand() % 13) + 3;
+   size_t x = random_int(0, 52);
+   const size_t start = x;
+   size_t n = random_int(3, 15);
    RecordProperty("start", x);
    RecordProperty("size", n);
    auto generator = [&x]() { return x++; };
@@ -1105,7 +1133,7 @@ TEST(generate, produces_a_sequence_with_n_elements) {
    // Then
    // Note: We need to test the entire sequence including end-state.
    auto aiter = actual.begin();
-   for (std::size_t i = 0; i < n && aiter != actual.end(); ++i, ++aiter) {
+   for (size_t i = 0; i < n && aiter != actual.end(); ++i, ++aiter) {
       ASSERT_EQ(start + i, *aiter);
    }
    ASSERT_TRUE(actual.empty());
@@ -1142,6 +1170,7 @@ TEST(range, increments_until_finishes_at_finish_value) {
 
    // When
    for (int ignore : target) {
+      (void)ignore;
       ++actual;
    }
 
@@ -1180,6 +1209,7 @@ TEST(range, decrements_until_finishes_at_finish) {
 
    // When
    for (int ignore : target) {
+      (void)ignore;
       --actual;
    }
 
@@ -1190,15 +1220,17 @@ TEST(range, decrements_until_finishes_at_finish) {
 
 TEST(empty_sequence, does_not_iterate) {
    // Given
-   std::size_t invocations = 0;
+   size_t expected = 0;
+   size_t invocations = 0;
 
    // When
    for (int ignored : sequence<int>()) {
+      (void)ignored;
       ++invocations;
    }
 
    // Then
-   ASSERT_EQ(0, invocations);
+   ASSERT_EQ(expected, invocations);
 }
 
 
@@ -1218,5 +1250,6 @@ TEST(empty_sequence, is_empty) {
 
 int main(int argc, char **argv) {
    ::testing::InitGoogleTest(&argc, argv);
+   seed_rng();
    return RUN_ALL_TESTS();
 }
