@@ -1245,6 +1245,30 @@ TEST(empty_sequence, is_empty) {
    ASSERT_TRUE(actual);
 }
 
+
+TEST(empty, true_when_sequence_is_empty) {
+   // Given
+   auto target = sequence<float>();
+
+   // When
+   bool actual = target | empty();
+
+   // Then
+   ASSERT_TRUE(actual);
+}
+
+
+TEST(empty, false_when_sequence_is_not_empty) {
+   // Given
+   auto target = from({1, 1, 2, 2, 3, 3, 4, 5});
+
+   // When
+   bool actual = target | empty();
+
+   // Then
+   ASSERT_FALSE(actual);
+}
+
 }
 
 

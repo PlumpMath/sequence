@@ -24,7 +24,7 @@ inline void check_delta(T, std::false_type) noexcept {
 
 
 inline auto empty() {
-   return sequence_manipulator([](sequence<auto> s) mutable { return s.empty; });
+   return sequence_manipulator([](sequence<auto> s) mutable { return s.empty(); });
 }
 
 
